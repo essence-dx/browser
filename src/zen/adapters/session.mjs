@@ -6,18 +6,37 @@
  * Session adapter — SessionStore on Gecko, chrome.sessions / storage on Chromium.
  */
 
-export function getTabState(tab) {
+function _chromiumSession() {
+  try {
+    return typeof chrome !== "undefined" && chrome?.storage?.session
+      ? chrome.storage.session
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getTabState(tab) {
+  const store = _chromiumSession();
+  if (store) {
+    const key = String(tab?.id ?? tab);
+    return (await store.get(key))?.[key] ?? null;
+  }
   return SessionStore.getTabState(tab);
 }
 
-export function setTabState(tab, state) {
+export async function setTabState(tab, state) {
+  const store = _chromiumSession();
+  if (store) {
+    const key = String(tab?.id ?? tab);
+    return store.set({ [key]: state });
+  }
   return SessionStore.setTabState(tab, state);
 }
 
 export function getAllWindowsRestoredPromise() {
+  if (_chromiumSession()) {
+    return Promise.resolve(true);
+  }
   return SessionStore.promiseAllWindowsRestored;
 }
-
-// Chromium stubs:
-// export async function getTabState(tab) { return (await chrome.storage.session.get(String(tab.id)))?.[tab.id] ?? null; }
-// export async function setTabState(tab, state) { return chrome.storage.session.set({[String(tab.id)]: state}); }

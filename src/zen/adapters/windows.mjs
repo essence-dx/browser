@@ -9,7 +9,19 @@
  * Consumers import from here instead of touching BrowserWindowTracker directly.
  */
 
+function _chromiumWindows() {
+  try {
+    return typeof chrome !== "undefined" && chrome?.windows ? chrome.windows : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getOrderedWindows() {
+  const cw = _chromiumWindows();
+  if (cw) {
+    return cw.getAll({ populate: true });
+  }
   const { BrowserWindowTracker } = ChromeUtils.importESModule(
     "resource:///modules/BrowserWindowTracker.sys.mjs"
   );
@@ -17,6 +29,10 @@ export async function getOrderedWindows() {
 }
 
 export async function getTopWindow() {
+  const cw = _chromiumWindows();
+  if (cw) {
+    return cw.getCurrent({ populate: true });
+  }
   const { BrowserWindowTracker } = ChromeUtils.importESModule(
     "resource:///modules/BrowserWindowTracker.sys.mjs"
   );
@@ -24,13 +40,12 @@ export async function getTopWindow() {
 }
 
 export async function getAllWindows() {
+  const cw = _chromiumWindows();
+  if (cw) {
+    return cw.getAll({ populate: true });
+  }
   const { BrowserWindowTracker } = ChromeUtils.importESModule(
     "resource:///modules/BrowserWindowTracker.sys.mjs"
   );
   return [...BrowserWindowTracker.orderedWindows];
 }
-
-// Chromium stubs — wire when engine === "chromium":
-// export async function getOrderedWindows() { return chrome.windows.getAll({ populate: true }); }
-// export async function getTopWindow() { return chrome.windows.getCurrent({ populate: true }); }
-// export async function getAllWindows() { return chrome.windows.getAll({ populate: true }); }

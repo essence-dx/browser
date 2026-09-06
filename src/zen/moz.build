@@ -6,6 +6,27 @@ EXTRA_PP_COMPONENTS += [
   "ZenComponents.manifest",
 ]
 
+# Lane 1 (chromium-migration): adapters + shared are Gecko-safe facades.
+# They are registered as EXTRA_JS_MODULES here (not DIRS) so the Gecko build
+# keeps working while Chromium consumes the same files via import. When
+# surfer.json migration.engine flips to "chromium", engine-chromium/ imports
+# these files directly and this block is skipped via ZEN_MIGRATION_ENGINE.
+EXTRA_JS_MODULES.zen.adapters += [
+  "adapters/engine.mjs",
+  "adapters/observers.mjs",
+  "adapters/prefs.mjs",
+  "adapters/session.mjs",
+  "adapters/storage.mjs",
+  "adapters/tabs.mjs",
+  "adapters/windows.mjs",
+  "adapters/xul.mjs",
+]
+
+EXTRA_JS_MODULES.zen.shared += [
+  "shared/zenColorUtils.mjs",
+  "shared/zenSplitLayout.mjs",
+]
+
 DIRS += [
     "boosts",
     "common",

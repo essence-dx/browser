@@ -50,8 +50,10 @@ export default [
   "zenObserversAdapter",
   "zenWindowsAdapter",
   "zenStorageAdapter",
+  "zenEngineAdapter",
   "zenColorUtils",
   "zenSplitLayout",
+  "chrome",
 
   "Ci",
   "Cu",

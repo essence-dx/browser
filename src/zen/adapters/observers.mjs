@@ -9,11 +9,31 @@
  * migration is a one-file swap.
  */
 
+const _bus =
+  typeof EventTarget === "function" ? new EventTarget() : null;
+
+function _chromiumAvailable() {
+  return (
+    _bus &&
+    (typeof Services === "undefined" || typeof Services?.obs === "undefined")
+  );
+}
+
 export function addObserver(observer, topic) {
+  if (_chromiumAvailable()) {
+    const fn = e => observer?.observe?.(e.detail.subject, topic, e.detail.data);
+    fn._zenTopic = topic;
+    fn._zenObserver = observer;
+    _bus.addEventListener(topic, fn);
+    return fn;
+  }
   return Services.obs.addObserver(observer, topic);
 }
 
 export function removeObserver(observer, topic) {
+  if (_chromiumAvailable()) {
+    return undefined;
+  }
   try {
     return Services.obs.removeObserver(observer, topic);
   } catch {
@@ -22,11 +42,9 @@ export function removeObserver(observer, topic) {
 }
 
 export function notifyObservers(subject, topic, data) {
+  if (_chromiumAvailable()) {
+    _bus.dispatchEvent(new CustomEvent(topic, { detail: { subject, data } }));
+    return undefined;
+  }
   return Services.obs.notifyObservers(subject, topic, data);
 }
-
-// Chromium stubs — wire when engine === "chromium":
-// const _bus = new EventTarget();
-// export function addObserver(observer, topic) { const fn = e => observer.observe?.(e.detail.subject, topic, e.detail.data); fn._topic = topic; _bus.addEventListener(topic, fn); return fn; }
-// export function removeObserver(observer, topic) { return undefined; }
-// export function notifyObservers(subject, topic, data) { _bus.dispatchEvent(new CustomEvent(topic, { detail: { subject, data } })); }

@@ -9,7 +9,21 @@
  * surfer.json migration.engine flag.
  */
 
-export function getBoolPref(key, fallback) {
+function _chromiumPrefs() {
+  try {
+    return typeof chrome !== "undefined" && chrome?.storage?.local
+      ? chrome.storage.local
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getBoolPref(key, fallback) {
+  const store = _chromiumPrefs();
+  if (store) {
+    return (await store.get(key))[key] ?? fallback;
+  }
   try {
     return Services.prefs.getBoolPref(key, fallback);
   } catch {
@@ -17,7 +31,11 @@ export function getBoolPref(key, fallback) {
   }
 }
 
-export function getIntPref(key, fallback) {
+export async function getIntPref(key, fallback) {
+  const store = _chromiumPrefs();
+  if (store) {
+    return (await store.get(key))[key] ?? fallback;
+  }
   try {
     return Services.prefs.getIntPref(key, fallback);
   } catch {
@@ -25,7 +43,11 @@ export function getIntPref(key, fallback) {
   }
 }
 
-export function getStringPref(key, fallback) {
+export async function getStringPref(key, fallback) {
+  const store = _chromiumPrefs();
+  if (store) {
+    return (await store.get(key))[key] ?? fallback;
+  }
   try {
     return Services.prefs.getStringPref(key, fallback);
   } catch {
@@ -33,17 +55,26 @@ export function getStringPref(key, fallback) {
   }
 }
 
-export function setBoolPref(key, value) {
+export async function setBoolPref(key, value) {
+  const store = _chromiumPrefs();
+  if (store) {
+    return store.set({ [key]: value });
+  }
   return Services.prefs.setBoolPref(key, value);
 }
 
-export function setIntPref(key, value) {
+export async function setIntPref(key, value) {
+  const store = _chromiumPrefs();
+  if (store) {
+    return store.set({ [key]: value });
+  }
   return Services.prefs.setIntPref(key, value);
 }
 
-export function setStringPref(key, value) {
+export async function setStringPref(key, value) {
+  const store = _chromiumPrefs();
+  if (store) {
+    return store.set({ [key]: value });
+  }
   return Services.prefs.setStringPref(key, value);
 }
-
-// Chromium stub — replace body when engine === "chromium"
-// export async function getBoolPref(key, fallback) { return (await chrome.storage.local.get(key))[key] ?? fallback; }

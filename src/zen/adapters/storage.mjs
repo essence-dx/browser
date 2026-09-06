@@ -9,39 +9,65 @@
  * Consumers import from here instead of touching PathUtils/IOUtils directly.
  */
 
+function _chromiumStorage() {
+  try {
+    return typeof chrome !== "undefined" && chrome?.storage?.local
+      ? chrome.storage.local
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function joinPath(...parts) {
+  if (_chromiumStorage()) {
+    return parts.join("/");
+  }
   return PathUtils.join(...parts);
 }
 
 export function getProfileDir() {
+  if (_chromiumStorage()) {
+    return "profile";
+  }
   return PathUtils.profileDir;
 }
 
 export async function makeDirectory(path, options) {
+  if (_chromiumStorage()) {
+    return undefined;
+  }
   return IOUtils.makeDirectory(path, options);
 }
 
 export async function pathExists(path) {
+  const store = _chromiumStorage();
+  if (store) {
+    return (await store.get(path))[path] !== undefined;
+  }
   return IOUtils.exists(path);
 }
 
 export async function readUTF8(path) {
+  const store = _chromiumStorage();
+  if (store) {
+    return (await store.get(path))[path] ?? "";
+  }
   return IOUtils.readUTF8(path);
 }
 
 export async function writeUTF8(path, data) {
+  const store = _chromiumStorage();
+  if (store) {
+    return store.set({ [path]: data });
+  }
   return IOUtils.writeUTF8(path, data);
 }
 
 export async function removePath(path) {
+  const store = _chromiumStorage();
+  if (store) {
+    return store.remove(path);
+  }
   return IOUtils.remove(path);
 }
-
-// Chromium stubs — wire when engine === "chromium":
-// export function joinPath(...parts) { return parts.join("/"); }
-// export function getProfileDir() { return "profile"; }
-// export async function makeDirectory() { return undefined; }
-// export async function pathExists(path) { return (await chrome.storage.local.get(path))[path] !== undefined; }
-// export async function readUTF8(path) { return (await chrome.storage.local.get(path))[path] ?? ""; }
-// export async function writeUTF8(path, data) { return chrome.storage.local.set({ [path]: data }); }
-// export async function removePath(path) { return chrome.storage.local.remove(path); }
