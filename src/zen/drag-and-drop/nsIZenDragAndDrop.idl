@@ -1,6 +1,10 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ *
+ * Chromium migration (lane 3): nsIZenDragAndDrop is Gecko-only XPCOM
+ * (native window move). ZenDragAndDrop.js caller maps to chrome.windows drag
+ * region / shell drag shim; this IDL + nsZenDragAndDrop.{cpp,h} stay as-is. */
 
 #include "nsISupports.idl"
 

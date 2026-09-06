@@ -4,7 +4,15 @@
 
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 
-const ADDONS_BUTTONS_HIDDEN = Services.prefs.getBoolPref(
+// Chromium migration (lane 3): prefs + XUL + observers via adapters.
+// Gecko: Services.prefs / document.createXULElement / MozXULElement / Services.obs.
+// Chromium: chrome.storage / document.createElement / template.innerHTML / chrome.events
+// (see src/zen/adapters/prefs.mjs, adapters/xul.mjs, adapters/observers.mjs).
+// Tab/window calls (this.window.gBrowser.*) map to chrome.tabs at the shell layer.
+import { getBoolPref, setBoolPref } from "../adapters/prefs.mjs";
+import { addObserver, removeObserver } from "../adapters/observers.mjs";
+
+const ADDONS_BUTTONS_HIDDEN = getBoolPref(
   "zen.theme.hide-unified-extensions-button",
   true
 );
@@ -47,6 +55,7 @@ export class nsZenSiteDataPanel {
 
   #init() {
     // Add a new button to the urlbar popup
+    // Chromium: parseXULFragment() (template.innerHTML); MozXULElement is Gecko-only.
     const button = this.window.MozXULElement.parseXULToFragment(`
       <box id="zen-site-data-icon-button" role="button" align="center" class="identity-box-button" delegatesanchor="true">
         <image />
@@ -100,7 +109,7 @@ export class nsZenSiteDataPanel {
   }
 
   #initBrowserListeners() {
-    Services.obs.addObserver(this, "zen-boosts-update");
+    addObserver(this, "zen-boosts-update");
     this.window.gBrowser.addProgressListener({
       onLocationChange: aWebProgress => {
         if (aWebProgress.isTopLevel) {
@@ -111,7 +120,7 @@ export class nsZenSiteDataPanel {
     this.window.addEventListener(
       "unload",
       () => {
-        Services.obs.removeObserver(this, "zen-boosts-update");
+        removeObserver(this, "zen-boosts-update");
       },
       { once: true }
     );
@@ -151,6 +160,7 @@ export class nsZenSiteDataPanel {
     // This function is a bit out of place, but it's related enough to the panel
     // that it's easier to do it here than in a separate module.
     const container = this.document.getElementById("page-action-buttons");
+    // Chromium: parseXULFragment() (template.innerHTML); MozXULElement is Gecko-only.
     const fragment = this.window.MozXULElement.parseXULToFragment(`
       <hbox id="zen-copy-url-button"
             class="urlbar-page-action"
@@ -307,6 +317,7 @@ export class nsZenSiteDataPanel {
     boost = null,
     enabled = false
   ) {
+    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
     const container = this.document.createXULElement("hbox");
     container.classList.add("permission-popup-boost-item");
 
@@ -320,6 +331,7 @@ export class nsZenSiteDataPanel {
       container.setAttribute("state", enabled ? "enabled" : "disabled");
     }
 
+    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
     const img = this.document.createXULElement("toolbarbutton");
     img.classList.add(
       "permission-popup-boost-icon",
@@ -328,17 +340,20 @@ export class nsZenSiteDataPanel {
     img.setAttribute("closemenu", "none");
     img.classList.add(iconClass);
 
+    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
     const labelContainer = this.document.createXULElement("vbox");
     labelContainer.setAttribute("flex", "1");
     labelContainer.setAttribute("align", "start");
     labelContainer.classList.add("permission-popup-boost-label-container");
 
+    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
     const nameLabel = this.document.createXULElement("label");
     nameLabel.setAttribute("flex", "1");
     nameLabel.setAttribute("class", "permission-popup-boost-label");
     nameLabel.textContent = title || "";
     labelContainer.appendChild(nameLabel);
 
+    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
     const stateLabel = this.document.createXULElement("label");
     stateLabel.setAttribute("class", "zen-permission-popup-boost-state-label");
     const stateLabelId = enabled
@@ -353,6 +368,7 @@ export class nsZenSiteDataPanel {
     container.appendChild(labelContainer);
 
     if (boost) {
+      // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
       const editorButton = this.document.createXULElement("toolbarbutton");
       editorButton.setAttribute("data-action-id", "zen-site-data-edit-boost");
       editorButton.setAttribute("data-boost-id", boost.id);
@@ -605,6 +621,7 @@ export class nsZenSiteDataPanel {
       });
     }
 
+    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
     const separator = this.document.createXULElement("toolbarseparator");
     list.appendChild(separator);
     const settingElements = [];
@@ -674,6 +691,7 @@ export class nsZenSiteDataPanel {
     const isCrossSiteCookie = id === "3rdPartyStorage";
 
     // Create a permission item for the site data panel.
+    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
     let container = this.document.createXULElement("hbox");
     const idNoSuffix = permission.id;
     container.classList.add(
@@ -688,6 +706,7 @@ export class nsZenSiteDataPanel {
       permission.state == SitePermissions.ALLOW ? "allow" : "block"
     );
 
+    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
     let img = this.document.createXULElement("toolbarbutton");
     img.classList.add(
       "permission-popup-permission-icon",
@@ -698,12 +717,14 @@ export class nsZenSiteDataPanel {
       img.classList.add(`zen-permission-${this.#iconMap[id]}-icon`);
     }
 
+    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
     let labelContainer = this.document.createXULElement("vbox");
     labelContainer.setAttribute("flex", "1");
     labelContainer.setAttribute("align", "start");
     labelContainer.classList.add("permission-popup-permission-label-container");
     labelContainer._permission = permission;
 
+    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
     let nameLabel = this.document.createXULElement("label");
     nameLabel.setAttribute("flex", "1");
     nameLabel.setAttribute("class", "permission-popup-permission-label");
@@ -725,6 +746,7 @@ export class nsZenSiteDataPanel {
     }
     labelContainer.appendChild(nameLabel);
 
+    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
     let stateLabel = this.document.createXULElement("label");
     stateLabel.setAttribute(
       "class",
@@ -953,10 +975,11 @@ export class nsZenSiteDataPanel {
 
   async #maybeShowFeatureCallout() {
     const kPref = "zen.site-data-panel.show-callout";
-    if (!Services.prefs.getBoolPref(kPref, false)) {
+    if (!getBoolPref(kPref, false)) {
       return;
     }
-    Services.prefs.setBoolPref(kPref, false);
+    setBoolPref(kPref, false);
+    // Chromium: chrome.tabs.onActivated; window.gBrowser.selectedTab is Gecko-only.
     const { gBrowser, gZenWorkspaces } = this.window;
     await gZenWorkspaces.promiseInitialized;
     await new Promise(resolve => {

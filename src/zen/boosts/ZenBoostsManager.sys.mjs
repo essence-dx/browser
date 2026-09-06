@@ -5,6 +5,14 @@
 import { JSONFile } from "resource://gre/modules/JSONFile.sys.mjs";
 import { nsZenBoostStyles } from "resource:///modules/zen/boosts/ZenBoostStyles.sys.mjs";
 
+// Chromium migration (lane 3): observer + prefs via adapters.
+// Gecko: Services.obs / Services.prefs. Chromium: chrome.events / chrome.storage
+// (see src/zen/adapters/observers.mjs, adapters/prefs.mjs).
+// Remaining Gecko (window/ww/filepicker/chrome:// URL) maps to chrome.windows /
+// chrome.fileSystem / extension URLs at the shell layer.
+import { notifyObservers } from "../adapters/observers.mjs";
+import { getBoolPref } from "../adapters/prefs.mjs";
+
 class nsZenBoostsManager {
   registeredDomains = new Map(); // <domain, { boosts: <id, boostEntry>, activeBoostID: null }>
   #stylesManager = new nsZenBoostStyles();
@@ -313,7 +321,7 @@ class nsZenBoostsManager {
       }
     }
 
-    Services.obs.notifyObservers(null, "zen-boosts-active-change", { id });
+    notifyObservers(null, "zen-boosts-active-change", { id });
 
     this.#writeToDisk(this.registeredDomains);
     this.#stylesManager.invalidateStyleForDomain(domain);
@@ -334,13 +342,13 @@ class nsZenBoostsManager {
         let unloadStyles = false;
         if (domainEntry.activeBoostId === id) {
           domainEntry.activeBoostId = null;
-          Services.obs.notifyObservers(null, "zen-boosts-active-change", {
+          notifyObservers(null, "zen-boosts-active-change", {
             id: null,
           });
           unloadStyles = true;
         } else {
           domainEntry.activeBoostId = id;
-          Services.obs.notifyObservers(null, "zen-boosts-active-change", {
+          notifyObservers(null, "zen-boosts-active-change", {
             id,
           });
         }
@@ -392,7 +400,7 @@ class nsZenBoostsManager {
    * @param {boolean} unloadStyles - Whether to unload styles during the update.
    */
   notify(unloadStyles = false) {
-    Services.obs.notifyObservers(null, "zen-boosts-update", { unloadStyles });
+    notifyObservers(null, "zen-boosts-update", { unloadStyles });
   }
 
   /**
@@ -640,6 +648,8 @@ class nsZenBoostsManager {
       }
     }
 
+    // Chromium: chrome.windows.create({url: <extension boost-editor page>}).
+    // Keep xhtml URL until the shell extension page lands.
     const editor = Services.ww.openWindow(
       parentWindow,
       "chrome://browser/content/zen-components/windows/zen-boost-editor.xhtml",
@@ -690,6 +700,7 @@ class nsZenBoostsManager {
     // From: firefox-main/browser/base/content/browser-commands.js:354
     // https://searchfox.org/firefox-main/source/browser/base/content/browser-commands.js#355:~:text=try%20%7B-,const,fp%2Eopen%28fpCallback%29%3B
 
+    // Chromium: <input type=file> / chrome.fileSystem; nsIFilePicker has no equivalent.
     const nsIFilePicker = Ci.nsIFilePicker;
     const fp = Cc["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
 
@@ -748,6 +759,7 @@ class nsZenBoostsManager {
    * @returns {Promise<object | null>} Returns a promise with the boost data or null
    */
   importBoost(parentWindow) {
+    // Chromium: <input type=file> / chrome.fileSystem; nsIFilePicker has no equivalent.
     const nsIFilePicker = Ci.nsIFilePicker;
     const fp = Cc["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
 
@@ -781,7 +793,7 @@ class nsZenBoostsManager {
    * From: ZenDownloadAnimation.mjs
    */
   #areTabsOnRightSide() {
-    return Services.prefs.getBoolPref("zen.tabs.vertical.right-side");
+    return getBoolPref("zen.tabs.vertical.right-side", false);
   }
 }
 

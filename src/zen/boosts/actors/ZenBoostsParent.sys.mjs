@@ -8,6 +8,14 @@ ChromeUtils.defineESModuleGetters(lazy, {
   gZenBoostsManager: "resource:///modules/zen/boosts/ZenBoostsManager.sys.mjs",
 });
 
+// Chromium migration (lane 3): observer bus via adapter.
+// Gecko: Services.obs. Chromium: chrome.events / EventTarget (see adapters/observers.mjs).
+import {
+  addObserver,
+  removeObserver,
+  notifyObservers,
+} from "../../adapters/observers.mjs";
+
 export class ZenBoostsParent extends JSWindowActorParent {
   static OBSERVERS = [
     "zen-boosts-update",
@@ -35,7 +43,7 @@ export class ZenBoostsParent extends JSWindowActorParent {
 
     this._observe = this.observe.bind(this);
     ZenBoostsParent.OBSERVERS.forEach(observe => {
-      Services.obs.addObserver(this._observe, observe);
+      addObserver(this._observe, observe);
     });
   }
 
@@ -44,7 +52,7 @@ export class ZenBoostsParent extends JSWindowActorParent {
    */
   didDestroy() {
     ZenBoostsParent.OBSERVERS.forEach(observe => {
-      Services.obs.removeObserver(this._observe, observe);
+      removeObserver(this._observe, observe);
     });
   }
 
@@ -105,6 +113,7 @@ export class ZenBoostsParent extends JSWindowActorParent {
 
         const { gDevTools } = require("devtools/client/framework/devtools");
 
+        // Chromium: chrome.windows.getLastFocused + chrome.tabs.query({active:true}).
         let win = Services.wm.getMostRecentWindow("navigator:browser");
         let tab = win.gBrowser.selectedTab;
 
@@ -125,7 +134,7 @@ export class ZenBoostsParent extends JSWindowActorParent {
           );
           break;
         }
-        Services.obs.notifyObservers(null, topic, msg);
+        notifyObservers(null, topic, msg);
         break;
       }
       case "ZenBoost:ZapSelector": {

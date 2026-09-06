@@ -7,6 +7,16 @@ const { gZenSpaceRoutingManager } = ChromeUtils.importESModule(
   "resource:///modules/zen/spacerouting/ZenSpaceRoutingManager.sys.mjs"
 );
 
+// Chromium migration (lane 3): observer bus via adapter.
+// Gecko: Services.obs. Chromium: chrome.events / EventTarget (see adapters/observers.mjs).
+// Dialog chrome:// document + doc.createXULElement map to an extension page +
+// document.createElement at the shell layer.
+import {
+  addObserver,
+  removeObserver,
+  notifyObservers,
+} from "../adapters/observers.mjs";
+
 export class nsZenSpaceRoutingDialog {
   doc = null;
   editorWindow = null;
@@ -29,7 +39,7 @@ export class nsZenSpaceRoutingDialog {
     this.killOtherShareInstances();
 
     nsZenSpaceRoutingDialog.OBSERVERS.forEach(observe => {
-      Services.obs.addObserver(this, observe);
+      addObserver(this, observe);
     });
 
     this.init();
@@ -116,21 +126,26 @@ export class nsZenSpaceRoutingDialog {
   createRouteElement(route) {
     const container = this.doc.getElementById("sr-content");
 
+    // Chromium: createXULElementLocal() (document.createElement); doc.createXULElement is Gecko-only.
     const root = this.doc.createXULElement("vbox");
     root.setAttribute("routeId", route.id);
     root.className = "sr-rule-container";
 
     // ---- Top row
 
+    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
     const topRow = this.doc.createXULElement("hbox");
     topRow.className = "sr-rule-row sr-rule-top";
 
+    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
     const topLabelContainer = this.doc.createXULElement("hbox");
     topLabelContainer.className = "sr-label-container";
 
+    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
     const urlIcon = this.doc.createXULElement("image");
     urlIcon.className = "sr-url-icon";
 
+    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
     const urlLabel = this.doc.createXULElement("label");
     urlLabel.className = "sr-label";
     urlLabel.setAttribute("data-l10n-id", "zen-space-routing-url");
@@ -139,13 +154,16 @@ export class nsZenSpaceRoutingDialog {
 
     // Match type
 
+    // Chromium: createXULElementLocal() (<select>); doc.createXULElement is Gecko-only.
     const matchTypeMenulist = this.doc.createXULElement("menulist");
     matchTypeMenulist.className = "select match-type-select";
 
+    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
     const matchTypePopup = this.doc.createXULElement("menupopup");
     matchTypeMenulist.appendChild(matchTypePopup);
 
     ["contains", "equal-to", "regex"].forEach(id => {
+      // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
       const menuItem = this.doc.createXULElement("menuitem");
       menuItem.setAttribute("data-l10n-id", `zen-space-routing-${id}`);
       menuItem.setAttribute("value", id);
@@ -161,6 +179,7 @@ export class nsZenSpaceRoutingDialog {
     input.value = route.reference;
     this.updateInputPlaceholder(route.matchType, input);
 
+    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
     const removeButton = this.doc.createXULElement("button");
     removeButton.className = "sr-remove";
 
@@ -168,15 +187,19 @@ export class nsZenSpaceRoutingDialog {
 
     // ---- Bottom row
 
+    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
     const bottomRow = this.doc.createXULElement("hbox");
     bottomRow.className = "sr-rule-row sr-rule-bottom";
 
+    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
     const bottomLabelContainer = this.doc.createXULElement("hbox");
     bottomLabelContainer.className = "sr-label-container";
 
+    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
     const openInIcon = this.doc.createXULElement("image");
     openInIcon.className = "sr-open-in-icon";
 
+    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
     const openInLabel = this.doc.createXULElement("label");
     openInLabel.className = "sr-label";
     openInLabel.setAttribute("data-l10n-id", "zen-space-routing-open-in");
@@ -185,9 +208,11 @@ export class nsZenSpaceRoutingDialog {
 
     // Open in
 
+    // Chromium: createXULElementLocal() (<select>); doc.createXULElement is Gecko-only.
     const openInMenulist = this.doc.createXULElement("menulist");
     openInMenulist.className = "select open-in-select";
 
+    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
     const openInMenupopup = this.doc.createXULElement("menupopup");
     openInMenulist.appendChild(openInMenupopup);
 
@@ -367,6 +392,7 @@ export class nsZenSpaceRoutingDialog {
       "zen-space-routing-most-recent-space",
     ]);
 
+    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
     const sectionHeader = this.doc.createXULElement("menuitem");
     sectionHeader.setAttribute("label", openInSpace.value);
     sectionHeader.setAttribute("disabled", "true");
@@ -377,16 +403,19 @@ export class nsZenSpaceRoutingDialog {
 
     let createXulItem = (text, id, iconPath = null) => {
       if (text === "sep") {
+        // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
         popupElement.appendChild(this.doc.createXULElement("menuseparator"));
         return;
       }
 
       availOptions.push(id || text);
+      // Chromium: createXULElementLocal() (<option>); doc.createXULElement is Gecko-only.
       const menuItem = this.doc.createXULElement("menuitem");
       menuItem.setAttribute("label", text);
       menuItem.setAttribute("value", id || text);
 
       if (iconPath) {
+        // Chromium: extension icon URL; chrome:// is Gecko-only.
         if (iconPath.startsWith("chrome://")) {
           menuItem.setAttribute("class", "menuitem-iconic");
           menuItem.setAttribute("image", iconPath);
@@ -420,7 +449,7 @@ export class nsZenSpaceRoutingDialog {
    */
   uninit() {
     nsZenSpaceRoutingDialog.OBSERVERS.forEach(observe => {
-      Services.obs.removeObserver(this, observe);
+      removeObserver(this, observe);
     });
   }
 
@@ -428,7 +457,7 @@ export class nsZenSpaceRoutingDialog {
    * Kills all other Space Routing dialog instances
    */
   killOtherShareInstances() {
-    Services.obs.notifyObservers(null, "zen-space-routing-kill");
+    notifyObservers(null, "zen-space-routing-kill");
   }
 
   /**

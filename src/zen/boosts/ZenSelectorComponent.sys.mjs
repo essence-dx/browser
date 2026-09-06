@@ -157,6 +157,7 @@ export class SelectorComponent {
   }
 
   get content() {
+    // Chromium: content WindowProxy stays alive; Cu.isDeadWrapper is Gecko-only.
     if (!this.#content || Cu.isDeadWrapper(this.#content)) {
       return null;
     }

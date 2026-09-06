@@ -4,6 +4,11 @@
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
+// Chromium migration (lane 3): learner persistence via prefs adapter.
+// Gecko: Services.prefs string pref. Chromium: chrome.storage.local
+// (see src/zen/adapters/prefs.mjs).
+import { getStringPref, setStringPref } from "../adapters/prefs.mjs";
+
 const lazy = {};
 
 let lazyDatabaseData = {};
@@ -18,6 +23,7 @@ function addDataToLazy(data) {
   } catch {}
 }
 
+// Chromium: chrome.storage.onChanged; XPCOM lazy pref getter is Gecko-only.
 XPCOMUtils.defineLazyPreferenceGetter(
   lazy,
   "rawDatabase",
@@ -53,7 +59,7 @@ class ZenUrlbarResultsLearner {
   }
 
   saveDatabase(db) {
-    Services.prefs.setStringPref(
+    setStringPref(
       "zen.urlbar.suggestions-learner",
       JSON.stringify(db || DEFAULT_DB_DATA)
     );

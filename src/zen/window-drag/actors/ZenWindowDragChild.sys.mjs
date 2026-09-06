@@ -4,8 +4,12 @@
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
+// Chromium: chrome.storage pref + getComputedStyle/elementFromPoint hit-test
+// (see src/zen/adapters/prefs.mjs).
+
 const lazy = {};
 
+// Chromium: chrome.storage (getIntPref); XPCOM lazy pref/service are Gecko-only.
 XPCOMUtils.defineLazyPreferenceGetter(
   lazy,
   "dragRegionHeightPercentage",
@@ -13,6 +17,7 @@ XPCOMUtils.defineLazyPreferenceGetter(
   10
 );
 
+// Chromium: DOM hit-test (getComputedStyle/elementFromPoint); XPCOM service is Gecko-only.
 XPCOMUtils.defineLazyServiceGetter(
   lazy,
   "zenWindowDragUtils",

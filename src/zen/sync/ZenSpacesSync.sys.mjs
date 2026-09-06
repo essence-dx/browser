@@ -15,6 +15,10 @@ import {
   ZenSpacesSyncModel,
 } from "resource:///modules/zen/ZenSpacesSyncModel.sys.mjs";
 
+// Chromium migration (lane 3): Weave SyncEngine -> chrome.storage.sync shim.
+// Observer bus via adapter (Gecko: Services.obs, Chromium: chrome.events).
+import { addObserver, removeObserver } from "../adapters/observers.mjs";
+
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -92,13 +96,13 @@ class ZenSpacesSyncTracker extends Tracker {
 
   onStart() {
     for (const topic of TRACKED_TOPICS) {
-      Services.obs.addObserver(this, topic);
+      addObserver(this, topic);
     }
   }
 
   onStop() {
     for (const topic of TRACKED_TOPICS) {
-      Services.obs.removeObserver(this, topic);
+      removeObserver(this, topic);
     }
   }
 

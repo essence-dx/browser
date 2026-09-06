@@ -6,6 +6,15 @@ const { gZenBoostsManager } = ChromeUtils.importESModule(
   "resource:///modules/zen/boosts/ZenBoostsManager.sys.mjs"
 );
 
+// Chromium migration (lane 3): observer bus + selected tab via adapters.
+// Gecko: Services.obs / openerWindow.gBrowser. Chromium: chrome.events / chrome.tabs
+// (see src/zen/adapters/observers.mjs, adapters/tabs.mjs).
+import {
+  addObserver,
+  removeObserver,
+  notifyObservers,
+} from "../adapters/observers.mjs";
+
 export class nsZenBoostEditor {
   doc = null;
   editorWindow = null;
@@ -49,7 +58,7 @@ export class nsZenBoostEditor {
     this.killOtherEditorInstances();
 
     nsZenBoostEditor.OBSERVERS.forEach(observe => {
-      Services.obs.addObserver(this, observe);
+      addObserver(this, observe);
     });
 
     this.init();
@@ -69,6 +78,7 @@ export class nsZenBoostEditor {
    * @returns {ZenBoostsParent} Boost JSActor parent
    */
   get zenBoostsParent() {
+    // Chromium: getSelectedTab() / chrome.tabs.query({active:true}).
     const linkedBrowser = this.openerWindow.gBrowser.selectedTab.linkedBrowser;
     const actor =
       linkedBrowser.browsingContext.currentWindowGlobal.getActor("ZenBoosts");
@@ -169,7 +179,7 @@ export class nsZenBoostEditor {
     this.uninitColorPicker();
 
     nsZenBoostEditor.OBSERVERS.forEach(observe => {
-      Services.obs.removeObserver(this, observe);
+      removeObserver(this, observe);
     });
   }
 
@@ -178,7 +188,7 @@ export class nsZenBoostEditor {
    * This ensures only one editor instance is open at a time.
    */
   killOtherEditorInstances() {
-    Services.obs.notifyObservers(null, "zen-boosts-kill-editor");
+    notifyObservers(null, "zen-boosts-kill-editor");
   }
 
   /**
@@ -389,6 +399,8 @@ export class nsZenBoostEditor {
    * @returns {Array<AString>} An array with names of available fonts.
    */
   fetchFontList() {
+    // Chromium: document.fonts / FontFaceSet has no system enumeration;
+    // shell provides a fallback list until a native font API lands.
     const enumerator = Cc["@mozilla.org/gfx/fontenumerator;1"].createInstance(
       Ci.nsIFontEnumerator
     );
@@ -485,15 +497,15 @@ ${cssSelector} {
 
 }`);
 
-    Services.obs.removeObserver(this, "selector-picker-picked");
+    removeObserver(this, "selector-picker-picked");
   }
 
   /**
    * Disables zap mode and picker mode
    */
   disableAllPickers() {
-    Services.obs.notifyObservers(null, "zen-boosts-disable-zap");
-    Services.obs.notifyObservers(null, "zen-boosts-disable-picker");
+    notifyObservers(null, "zen-boosts-disable-zap");
+    notifyObservers(null, "zen-boosts-disable-picker");
   }
 
   onInspectorButtonPressed() {
@@ -526,9 +538,9 @@ ${cssSelector} {
     }
 
     if (data == "onenable") {
-      Services.obs.addObserver(this, "selector-picker-picked");
+      addObserver(this, "selector-picker-picked");
     } else if (data == "ondisable") {
-      Services.obs.removeObserver(this, "selector-picker-picked");
+      removeObserver(this, "selector-picker-picked");
     }
   }
 
@@ -1387,6 +1399,7 @@ ${cssSelector} {
     let input = {
       value: this.currentBoostData.boostName, // Default value and also output
     };
+    // Chromium: extension dialog / window.prompt; Services.prompt has no equivalent.
     const success = await Services.prompt.prompt(
       this.openerWindow,
       title.value,

@@ -4,6 +4,14 @@
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
+// Chromium migration (lane 3): action enablement + selected tab via adapters.
+// Gecko: Services.prefs / window.gBrowser. Chromium: chrome.storage / chrome.tabs
+// (see src/zen/adapters/prefs.mjs, adapters/tabs.mjs).
+// Icon chrome:// URLs below become extension icon URLs at the shell layer;
+// UrlbarProvider shell maps to chrome.omnibox below.
+import { getBoolPref, setIntPref } from "../adapters/prefs.mjs";
+import { getSelectedTab } from "../adapters/tabs.mjs";
+
 const lazy = {};
 
 XPCOMUtils.defineLazyPreferenceGetter(
@@ -18,7 +26,7 @@ ChromeUtils.defineLazyGetter(lazy, "l10n", () => {
 });
 
 function isNotEmptyTab(window) {
-  return !window.gBrowser.selectedTab.hasAttribute("zen-empty-tab");
+  return !getSelectedTab(window)?.hasAttribute("zen-empty-tab");
 }
 
 const globalActionsTemplate = [
@@ -72,8 +80,8 @@ const globalActionsTemplate = [
     command: "cmd_zenTogglePinTab",
     icon: "chrome://browser/skin/zen-icons/pin.svg",
     isAvailable: window => {
-      const tab = window.gBrowser.selectedTab;
-      return !tab.hasAttribute("zen-empty-tab") && !tab.pinned;
+      const tab = getSelectedTab(window);
+      return !tab?.hasAttribute("zen-empty-tab") && !tab?.pinned;
     },
   },
   {
@@ -81,8 +89,8 @@ const globalActionsTemplate = [
     command: "cmd_zenTogglePinTab",
     icon: "chrome://browser/skin/zen-icons/unpin.svg",
     isAvailable: window => {
-      const tab = window.gBrowser.selectedTab;
-      return !tab.hasAttribute("zen-empty-tab") && tab.pinned;
+      const tab = getSelectedTab(window);
+      return !tab?.hasAttribute("zen-empty-tab") && tab?.pinned;
     },
   },
   {
@@ -98,15 +106,17 @@ const globalActionsTemplate = [
         return false;
       }
 
-      // Keep this action consistent with the rest of the Boosts UI.
-      if (!Services.prefs.getBoolPref("zen.boosts.enabled", false)) {
+      // Chromium: chrome.storage (getBoolPref) gates the boost action.
+      if (!getBoolPref("zen.boosts.enabled", false)) {
         return false;
       }
 
+      // Chromium: tab URL via chrome.tabs.query({active:true}).
       const uri = window.gBrowser.currentURI;
       return !!uri?.schemeIs && (uri.schemeIs("http") || uri.schemeIs("https"));
     },
     command: window => {
+      // Chromium: tab URL via chrome.tabs.query({active:true}).
       const uri = window.gBrowser.currentURI;
       if (!uri?.schemeIs || !(uri.schemeIs("http") || uri.schemeIs("https"))) {
         return;
@@ -194,12 +204,12 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-add-to-essentials",
     command: window =>
-      window.gZenPinnedTabManager.addToEssentials(window.gBrowser.selectedTab),
+      window.gZenPinnedTabManager.addToEssentials(getSelectedTab(window)),
     isAvailable: window => {
+      const tab = getSelectedTab(window);
       return (
-        window.gZenPinnedTabManager.canEssentialBeAdded(
-          window.gBrowser.selectedTab
-        ) && !window.gBrowser.selectedTab.hasAttribute("zen-essential")
+        window.gZenPinnedTabManager.canEssentialBeAdded(tab) &&
+        !tab?.hasAttribute("zen-essential")
       );
     },
     icon: "chrome://browser/skin/zen-icons/essential-add.svg",
@@ -207,9 +217,9 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-remove-from-essentials",
     command: window =>
-      window.gZenPinnedTabManager.removeEssentials(window.gBrowser.selectedTab),
+      window.gZenPinnedTabManager.removeEssentials(getSelectedTab(window)),
     isAvailable: window =>
-      window.gBrowser.selectedTab.hasAttribute("zen-essential"),
+      getSelectedTab(window)?.hasAttribute("zen-essential") ?? false,
     icon: "chrome://browser/skin/zen-icons/essential-remove.svg",
   },
   {
@@ -227,7 +237,7 @@ const globalActionsTemplate = [
   },
   {
     l10nId: "zen-action-switch-to-automatic-appearance",
-    command: () => Services.prefs.setIntPref("zen.view.window.scheme", 2),
+    command: () => setIntPref("zen.view.window.scheme", 2),
     icon: "chrome://browser/skin/zen-icons/sparkles.svg",
     isAvailable: () => {
       return lazy.currentTheme !== 2;
@@ -235,7 +245,7 @@ const globalActionsTemplate = [
   },
   {
     l10nId: "zen-action-switch-to-light-mode",
-    command: () => Services.prefs.setIntPref("zen.view.window.scheme", 1),
+    command: () => setIntPref("zen.view.window.scheme", 1),
     icon: "chrome://browser/skin/zen-icons/face-sun.svg",
     isAvailable: () => {
       return lazy.currentTheme !== 1;
@@ -243,7 +253,7 @@ const globalActionsTemplate = [
   },
   {
     l10nId: "zen-action-switch-to-dark-mode",
-    command: () => Services.prefs.setIntPref("zen.view.window.scheme", 0),
+    command: () => setIntPref("zen.view.window.scheme", 0),
     icon: "chrome://browser/skin/zen-icons/moon-stars.svg",
     isAvailable: () => {
       return lazy.currentTheme !== 0;

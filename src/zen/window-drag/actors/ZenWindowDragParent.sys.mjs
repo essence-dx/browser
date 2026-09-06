@@ -4,8 +4,14 @@
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
+// Chromium migration (lane 3): native window move via windows adapter.
+// Gecko: nsIZenDragAndDrop XPCOM + Services.obs. Chromium: chrome.windows drag
+// region / shell drag shim + chrome.events (see src/zen/adapters/observers.mjs).
+import { notifyObservers } from "../../adapters/observers.mjs";
+
 const lazy = {};
 
+// Chromium: XPCOM lazy service has no equivalent; shell provides a drag shim.
 XPCOMUtils.defineLazyServiceGetter(
   lazy,
   "zenDragAndDropService",
@@ -27,7 +33,7 @@ export class ZenWindowDragParent extends JSWindowActorParent {
         if (Cu.isInAutomation) {
           // Tests can't exercise a real OS drag session; let them observe
           // the decision instead.
-          Services.obs.notifyObservers(win, "zen-window-drag-started");
+          notifyObservers(win, "zen-window-drag-started");
           break;
         }
         lazy.zenDragAndDropService.beginNativeWindowMove(win);

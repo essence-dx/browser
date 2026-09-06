@@ -4,6 +4,12 @@
 
 import { nsZenLiveFolderProvider } from "resource:///modules/zen/ZenLiveFolder.sys.mjs";
 
+// Chromium migration (lane 3): prefs + tab open via adapters.
+// Gecko: Services.prefs / manager.window.gBrowser. Chromium: chrome.storage /
+// chrome.tabs (see src/zen/adapters/prefs.mjs, adapters/tabs.mjs).
+// Icon chrome:// URL below becomes an extension URL at the shell layer.
+import { getBoolPref } from "../../adapters/prefs.mjs";
+
 export class nsGithubLiveFolderProvider extends nsZenLiveFolderProvider {
   static type = "github";
 
@@ -36,10 +42,7 @@ export class nsGithubLiveFolderProvider extends nsZenLiveFolderProvider {
       if (
         this.state.type === "pull-requests" &&
         typeof this.state.isJsonApi !== "boolean" &&
-        !Services.prefs.getBoolPref(
-          "zen.live-folders.github.skip-new-pr-ui-check",
-          false
-        )
+        !getBoolPref("zen.live-folders.github.skip-new-pr-ui-check", false)
       ) {
         const { text, status } = await this.fetch(this.state.url, {
           headers: {
@@ -388,6 +391,7 @@ export class nsGithubLiveFolderProvider extends nsZenLiveFolderProvider {
 
     switch (errorId) {
       case "zen-live-folder-github-no-auth": {
+        // Chromium: chrome.tabs.create({url}) + select; addTrustedTab is Gecko-only.
         const tab = this.manager.window.gBrowser.addTrustedTab(
           "https://github.com/login"
         );

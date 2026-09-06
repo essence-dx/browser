@@ -6,6 +6,12 @@
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
+// Chromium migration (lane 3): window/tab sync via adapters.
+// Gecko: BrowserWindowTracker + gBrowser + Services.obs. Chromium: chrome.windows /
+// chrome.tabs / chrome.events (see src/zen/adapters/windows.mjs, adapters/tabs.mjs,
+// adapters/observers.mjs). Session tab-state calls map to adapters/session.mjs.
+import { addObserver, removeObserver } from "../adapters/observers.mjs";
+
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -178,7 +184,7 @@ class nsZenWindowSync {
     }
     this.#initialized = true;
     for (let topic of OBSERVING) {
-      Services.obs.addObserver(this, topic);
+      addObserver(this, topic);
     }
   }
 
@@ -188,7 +194,7 @@ class nsZenWindowSync {
     }
     this.#initialized = false;
     for (let topic of OBSERVING) {
-      Services.obs.removeObserver(this, topic);
+      removeObserver(this, topic);
     }
   }
 

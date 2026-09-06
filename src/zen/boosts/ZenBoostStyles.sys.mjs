@@ -15,6 +15,10 @@ const lazy = XPCOMUtils.declareLazy({
 
 const AGENT_SHEET = Ci.nsIStyleSheetService.AGENT_SHEET;
 
+// Chromium migration (lane 3): boost CSS injection.
+// Gecko: nsIStyleSheetService/winUtils.loadSheet. Chromium: chrome.scripting.insertCSS
+// with the same style string (see adapters/xul.mjs for DOM fallback notes).
+
 export class nsZenBoostStyles {
   #stylesCache = new Map();
 
@@ -104,6 +108,7 @@ export class nsZenBoostStyles {
    * @private
    */
   #convertStyleToDataUri(rawStyle) {
+    // Chromium: chrome.scripting.insertCSS({ css }); nsIStyleSheetService is Gecko-only.
     const encodedStyle = encodeURIComponent(rawStyle);
     return Services.io.newURI(`data:text/css;charset=utf-8,${encodedStyle}`);
   }
@@ -116,6 +121,7 @@ export class nsZenBoostStyles {
    * @private
    */
   #cacheStyle(styleUri, domain) {
+    // Chromium: style id via crypto.randomUUID(); store in chrome.storage.session.
     this.#stylesCache.set(domain, {
       uuid: Services.uuid.generateUUID().toString(),
       uri: styleUri,

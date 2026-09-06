@@ -1,6 +1,10 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ *
+ * Chromium migration (lane 3): nsIZenModsBackend is Gecko-only XPCOM.
+ * The JS caller (ZenMods.mjs #modsBackend) maps to a chrome.scripting backend;
+ * this IDL + nsZenModsBackend.{cpp,h} stay as-is until the shell shim lands. */
 
 #include "nsISupports.idl"
 #include "nsIURI.idl"

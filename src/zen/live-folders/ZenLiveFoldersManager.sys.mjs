@@ -17,6 +17,13 @@ ChromeUtils.defineLazyGetter(
   () => new Localization(["browser/zen-live-folders.ftl"])
 );
 
+// Chromium migration (lane 3): observers + prefs + tabs via adapters.
+// Gecko: Services.obs / Services.prefs / window.gBrowser. Chromium: chrome.events /
+// chrome.storage / chrome.tabs (see src/zen/adapters/observers.mjs, adapters/prefs.mjs,
+// adapters/tabs.mjs). Icon chrome:// URL below becomes an extension URL.
+import { addObserver, removeObserver } from "../adapters/observers.mjs";
+import { getBoolPref, setBoolPref } from "../adapters/prefs.mjs";
+
 const DEFAULT_FETCH_INTERVAL = 30 * 60 * 1000;
 const providers = [
   {
@@ -70,7 +77,7 @@ class nsZenLiveFoldersManager {
       return;
     }
 
-    Services.obs.removeObserver(this, "wake_notification");
+    removeObserver(this, "wake_notification");
     if (this.#boundHandleEvent) {
       lazy.ZenWindowSync.removeSyncHandler(this.#boundHandleEvent);
       this.#boundHandleEvent = null;
@@ -90,7 +97,7 @@ class nsZenLiveFoldersManager {
   // Event Handling
   // --------------
   #initEventListeners() {
-    Services.obs.addObserver(this, "wake_notification");
+    addObserver(this, "wake_notification");
 
     this.#boundHandleEvent = this.handleEvent.bind(this);
     lazy.ZenWindowSync.addSyncHandler(this.#boundHandleEvent);
@@ -331,11 +338,12 @@ class nsZenLiveFoldersManager {
         labelElement.removeAttribute("live-folder-animation");
       });
 
-    if (Services.prefs.getBoolPref("zen.live-folders.promotion.shown", false)) {
+    if (getBoolPref("zen.live-folders.promotion.shown", false)) {
       return;
     }
-    Services.prefs.setBoolPref("zen.live-folders.promotion.shown", true);
+    setBoolPref("zen.live-folders.promotion.shown", true);
     let window = this.window;
+    // Chromium: chrome.tabs + extension callout; window.gBrowser is Gecko-only.
     let gBrowser = window.gBrowser;
     let isRightSide = window.gZenVerticalTabsManager._prefsRightSide;
     const callout = new lazy.FeatureCallout({
@@ -459,6 +467,7 @@ class nsZenLiveFoldersManager {
       existingItemIds.add(itemId);
     }
 
+    // Chromium: chrome.tabs.remove/create; window.gBrowser is Gecko-only.
     this.window.gBrowser.removeTabs(outdatedTabs, {
       skipSessionStore: true,
       animate: !folder.collapsed,
@@ -497,6 +506,7 @@ class nsZenLiveFoldersManager {
         );
       })
       .map(item => {
+        // Chromium: chrome.tabs.create({pinned:true}); addTrustedTab is Gecko-only.
         const tab = this.window.gBrowser.addTrustedTab(item.url, {
           createLazyBrowser: true,
           inBackground: true,
@@ -505,12 +515,13 @@ class nsZenLiveFoldersManager {
           lazyTabTitle: item.title,
           userContextId,
         });
-        // createLazyBrowser can't be pinned by default
+        // Chromium: chrome.tabs.update(tabId,{pinned:true}); pinTab is Gecko-only.
         this.window.gBrowser.pinTab(tab);
         if (userContextId) {
           tab.setAttribute("zenDefaultUserContextId", "true");
         }
         if (item.icon) {
+          // Chromium: chrome.tabs favicon; setIcon/TabStateCache are Gecko-only.
           this.window.gBrowser.setIcon(tab, item.icon);
           if (tab.linkedBrowser) {
             lazy.TabStateCache.update(tab.linkedBrowser.permanentKey, {

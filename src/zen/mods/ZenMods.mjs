@@ -7,6 +7,28 @@ import {
   nsZenMultiWindowFeature,
 } from "chrome://browser/content/zen-components/ZenCommonUtils.mjs";
 
+// Chromium migration (lane 3): prefs + storage + session via adapters.
+// Gecko: Services.prefs / IOUtils+PathUtils / SessionStore / Cc[nsIZenModsBackend].
+// Chromium: chrome.storage / chrome.storage.local(+downloads) / chrome.sessions /
+// chrome.scripting (see src/zen/adapters/prefs.mjs, adapters/storage.mjs,
+// adapters/session.mjs). chrome:// import below becomes a shared/ module.
+import {
+  getBoolPref,
+  getIntPref,
+  getStringPref,
+  setBoolPref,
+  setIntPref,
+  setStringPref,
+} from "../adapters/prefs.mjs";
+import {
+  joinPath,
+  getProfileDir,
+  makeDirectory,
+  pathExists,
+  readUTF8,
+  writeUTF8,
+} from "../adapters/storage.mjs";
+
 const DOT_RE = /\./g;
 const WHITESPACE_RE = /\s/g;
 const NON_NAME_RE = /[^A-Za-z_-]+/g;
@@ -41,6 +63,7 @@ class nsZenMods extends nsZenPreloadedFeature {
   #_modsBackend = null;
 
   get #modsBackend() {
+    // Chromium: chrome.scripting backend; nsIZenModsBackend XPCOM is Gecko-only.
     if (!this.#_modsBackend) {
       this.#_modsBackend = Cc["@mozilla.org/zen/mods-backend;1"].getService(
         Ci.nsIZenModsBackend
@@ -50,7 +73,7 @@ class nsZenMods extends nsZenPreloadedFeature {
   }
 
   get #styleSheetPath() {
-    return PathUtils.join(PathUtils.profileDir, "chrome", "zen-themes.css");
+    return joinPath(getProfileDir(), "chrome", "zen-themes.css");
   }
 
   async #handleDisableMods() {
@@ -58,15 +81,15 @@ class nsZenMods extends nsZenPreloadedFeature {
   }
 
   #getStylesheetPathForMod(mod) {
-    return PathUtils.join(this.getModFolder(mod.id), "chrome.css");
+    return joinPath(this.getModFolder(mod.id), "chrome.css");
   }
 
   async #readStylesheet() {
     const path = this.modsRootPath;
-    if (!(await IOUtils.exists(path))) {
+    if (!(await pathExists(path))) {
       return "";
     }
-    return await IOUtils.readUTF8(this.#styleSheetPath);
+    return await readUTF8(this.#styleSheetPath);
   }
 
   async #insertStylesheet() {
@@ -102,7 +125,7 @@ class nsZenMods extends nsZenPreloadedFeature {
   }
 
   async #getEnabledMods() {
-    if (Services.prefs.getBoolPref("zen.themes.disable-all", false)) {
+    if (getBoolPref("zen.themes.disable-all", false)) {
       // eslint-disable-next-line no-console
       console.info("[ZenMods]: Mods are disabled by user preference.");
       return [];
@@ -136,14 +159,11 @@ class nsZenMods extends nsZenPreloadedFeature {
           continue;
         }
 
+        // Chromium: same getter/setter shape, backed by chrome.storage (see adapters/prefs.mjs).
         const getProperty =
-          type === "checkbox"
-            ? Services.prefs.getBoolPref
-            : Services.prefs.getStringPref;
+          type === "checkbox" ? getBoolPref : getStringPref;
         const setProperty =
-          type === "checkbox"
-            ? Services.prefs.setBoolPref
-            : Services.prefs.setStringPref;
+          type === "checkbox" ? setBoolPref : setStringPref;
 
         try {
           getProperty(property);
@@ -188,7 +208,7 @@ class nsZenMods extends nsZenPreloadedFeature {
           sanitizedProperty: property?.replaceAll(DOT_RE, "-"),
           value:
             enabled === undefined || enabled
-              ? Services.prefs.getStringPref(property, "")
+              ? getStringPref(property, "")
               : "",
         })),
       })
@@ -272,7 +292,8 @@ class nsZenMods extends nsZenPreloadedFeature {
         content += `/* Readme: ${mod.readme} */\n`;
       }
 
-      const chromeContent = await IOUtils.readUTF8(mod._filePath);
+      // Chromium: readUTF8()/writeUTF8() via adapters/storage.mjs.
+      const chromeContent = await readUTF8(mod._filePath);
       content += chromeContent;
     }
 
@@ -280,7 +301,7 @@ class nsZenMods extends nsZenPreloadedFeature {
 
     const buffer = new TextEncoder().encode(content);
 
-    await IOUtils.write(this.#styleSheetPath, buffer);
+    await writeUTF8(this.#styleSheetPath, buffer);
   }
 
   #compareVersions(version1, version2) {
@@ -347,6 +368,7 @@ class nsZenMods extends nsZenPreloadedFeature {
 
         // convert the data into a Uint8Array
         const buffer = new TextEncoder().encode(data);
+        // Chromium: writeUTF8() / chrome.downloads; IOUtils.write is Gecko-only.
         await IOUtils.write(path, buffer);
 
         return; // to exit the loop
@@ -408,18 +430,19 @@ class nsZenMods extends nsZenPreloadedFeature {
   }
 
   get modsRootPath() {
-    return PathUtils.join(PathUtils.profileDir, "chrome", "zen-themes");
+    return joinPath(getProfileDir(), "chrome", "zen-themes");
   }
 
   get modsDataFile() {
-    return PathUtils.join(PathUtils.profileDir, "zen-themes.json");
+    return joinPath(getProfileDir(), "zen-themes.json");
   }
 
   getModFolder(modId) {
-    return PathUtils.join(this.modsRootPath, modId);
+    return joinPath(this.modsRootPath, modId);
   }
 
   async getMods() {
+    // Chromium: chrome.storage.local JSON doc; IOUtils JSON helpers are Gecko-only.
     if (!(await IOUtils.exists(this.modsDataFile))) {
       await IOUtils.writeJSON(this.modsDataFile, {});
 
@@ -438,6 +461,7 @@ class nsZenMods extends nsZenPreloadedFeature {
       // If we have a corrupted file, reset it
       await IOUtils.writeJSON(this.modsDataFile, {});
 
+      // Chromium: chrome.windows.getLastFocused + extension toast; Services.wm is Gecko-only.
       Services.wm
         .getMostRecentWindow("navigator:browser")
         .gZenUIManager.showToast("zen-themes-corrupted", {
@@ -449,13 +473,10 @@ class nsZenMods extends nsZenPreloadedFeature {
   }
 
   async getModPreferences(mod) {
-    const modPath = PathUtils.join(
-      this.modsRootPath,
-      mod.id,
-      "preferences.json"
-    );
+    // Chromium: chrome.storage.local JSON doc; IOUtils JSON helpers are Gecko-only.
+    const modPath = joinPath(this.modsRootPath, mod.id, "preferences.json");
 
-    if (!(await IOUtils.exists(modPath)) || !mod.preferences) {
+    if (!(await pathExists(modPath)) || !mod.preferences) {
       return [];
     }
 
@@ -478,10 +499,11 @@ class nsZenMods extends nsZenPreloadedFeature {
 
   async init() {
     try {
+      // Chromium: getAllWindowsRestoredPromise() / chrome.sessions (see adapters/session.mjs).
       await SessionStore.promiseInitialized;
 
       if (
-        Services.prefs.getBoolPref("zen.themes.disable-all", false) ||
+        getBoolPref("zen.themes.disable-all", false) ||
         Services.appinfo.inSafeMode
       ) {
         console.warn("[ZenMods]: Mods disabled by user or in safe mode.");
@@ -524,10 +546,12 @@ class nsZenMods extends nsZenPreloadedFeature {
       console.error("[ZenMods]: Error loading Zen Mods:", e);
     }
 
+    // Chromium: chrome.storage.onChanged; Services.prefs.addObserver is Gecko-only.
     Services.prefs.addObserver(
       this.updatePref,
       this.#rebuildModsStylesheet.bind(this)
     );
+    // Chromium: chrome.storage.onChanged; Services.prefs.addObserver is Gecko-only.
     Services.prefs.addObserver(
       "zen.themes.disable-all",
       this.#handleDisableMods.bind(this)
@@ -535,32 +559,22 @@ class nsZenMods extends nsZenPreloadedFeature {
   }
 
   #setNewMilestoneIfNeeded() {
-    const previousMilestone = Services.prefs.getStringPref(
-      "zen.mods.milestone",
-      ""
-    );
+    const previousMilestone = getStringPref("zen.mods.milestone", "");
     if (previousMilestone != Services.appinfo.version) {
-      Services.prefs.setStringPref(
-        "zen.mods.milestone",
-        Services.appinfo.version
-      );
+      setStringPref("zen.mods.milestone", Services.appinfo.version);
+      // Chromium: chrome.storage.local.remove(); clearUserPref is Gecko-only.
       Services.prefs.clearUserPref("zen.mods.last-update");
     }
   }
 
   #shouldAutoUpdate() {
-    const daysBeforeUpdate = Services.prefs.getIntPref(
-      "zen.mods.auto-update-days"
-    );
-    const lastUpdatedSec = Services.prefs.getIntPref(
-      "zen.mods.last-update",
-      -1
-    );
+    const daysBeforeUpdate = getIntPref("zen.mods.auto-update-days", 7);
+    const lastUpdatedSec = getIntPref("zen.mods.last-update", -1);
     const nowSec = Math.floor(Date.now() / 1000);
     const daysSinceUpdate = (nowSec - lastUpdatedSec) / (60 * 60 * 24);
 
     return (
-      (Services.prefs.getBoolPref("zen.mods.auto-update", true) &&
+      (getBoolPref("zen.mods.auto-update", true) &&
         daysSinceUpdate >= daysBeforeUpdate) ||
       lastUpdatedSec < 0
     );
@@ -608,10 +622,7 @@ class nsZenMods extends nsZenPreloadedFeature {
     );
 
     await this.updateMods(mods);
-    Services.prefs.setIntPref(
-      "zen.mods.last-update",
-      Math.floor(Date.now() / 1000)
-    );
+    setIntPref("zen.mods.last-update", Math.floor(Date.now() / 1000));
     return updates.filter(update => {
       return update !== null;
     });
@@ -622,6 +633,7 @@ class nsZenMods extends nsZenPreloadedFeature {
 
     console.warn(`[ZenMods]: Removing mod ${modPath}`);
 
+    // Chromium: removePath() / chrome.storage.local; IOUtils.remove is Gecko-only.
     await IOUtils.remove(modPath, { recursive: true, ignoreAbsent: true });
 
     const mods = await this.getMods();
@@ -667,30 +679,23 @@ class nsZenMods extends nsZenPreloadedFeature {
   }
 
   triggerModsUpdate() {
-    Services.prefs.setBoolPref(
-      this.updatePref,
-      !Services.prefs.getBoolPref(this.updatePref)
-    );
+    // Chromium: setBoolPref()/getBoolPref() toggle the update observer pref.
+    setBoolPref(this.updatePref, !getBoolPref(this.updatePref, false));
   }
 
   async installMod(mod) {
+    // Chromium: chrome.storage.local + chrome.downloads; IOUtils/PathUtils are Gecko-only.
     try {
-      const modPath = PathUtils.join(this.modsRootPath, mod.id);
-      await IOUtils.makeDirectory(modPath, { ignoreExisting: true });
+      const modPath = joinPath(this.modsRootPath, mod.id);
+      await makeDirectory(modPath, { ignoreExisting: true });
 
-      await this.#downloadUrlToFile(
-        mod.style,
-        PathUtils.join(modPath, "chrome.css")
-      );
-      await this.#downloadUrlToFile(
-        mod.readme,
-        PathUtils.join(modPath, "readme.md")
-      );
+      await this.#downloadUrlToFile(mod.style, joinPath(modPath, "chrome.css"));
+      await this.#downloadUrlToFile(mod.readme, joinPath(modPath, "readme.md"));
 
       if (mod.preferences) {
         await this.#downloadUrlToFile(
           mod.preferences,
-          PathUtils.join(modPath, "preferences.json")
+          joinPath(modPath, "preferences.json")
         );
       }
     } catch (e) {
@@ -707,7 +712,8 @@ class nsZenMods extends nsZenPreloadedFeature {
           continue;
         }
 
-        if (!(await IOUtils.exists(this.getModFolder(modId)))) {
+        // Chromium: pathExists() via adapters/storage.mjs.
+        if (!(await pathExists(this.getModFolder(modId)))) {
           await this.installMod(mod);
         }
       } catch (e) {

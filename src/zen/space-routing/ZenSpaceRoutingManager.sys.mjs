@@ -4,6 +4,11 @@
 
 import { JSONFile } from "resource://gre/modules/JSONFile.sys.mjs";
 
+// Chromium migration (lane 3): context-menu injection + dialog via xul/tabs adapters.
+// Gecko: window.MozXULElement / window.gBrowser / Services.wm / gDialogBox(chrome:// xhtml).
+// Chromium: parseXULFragment()/createXULElementLocal() + chrome.tabs + extension dialog page
+// (see src/zen/adapters/xul.mjs, adapters/tabs.mjs, adapters/windows.mjs).
+
 class nsZenSpaceRoutingManager {
   #file = null;
   #saveFilename = "zen-space-routing.jsonlz4";
@@ -24,6 +29,7 @@ class nsZenSpaceRoutingManager {
    * @param {nsIDOMWindow} window - The browser window that just started up
    */
   onDelayedBrowserStartup(window) {
+    // Chromium: parseXULFragment(); window.MozXULElement is Gecko-only.
     const element = window.MozXULElement.parseXULToFragment(`
         <menuseparator/>
         <menuitem id="context_zen-add-domain-to-routing"
@@ -50,6 +56,7 @@ class nsZenSpaceRoutingManager {
    * @param {Event} event - The event param
    */
   #updateTabCloseCountState(event) {
+    // Chromium: chrome.tabs.query({}); window.gBrowser.selectedTabs is Gecko-only.
     const window = event.target.documentGlobal;
     window.document.l10n.setArgs(
       window.document.getElementById("context_zen-add-domain-to-routing"),
@@ -63,6 +70,7 @@ class nsZenSpaceRoutingManager {
    * @param {Event} event - The event parameter
    */
   #onAddSelectedToRouting(event) {
+    // Chromium: chrome.tabs.query({highlighted:true}); window.gBrowser is Gecko-only.
     const window = event.target.documentGlobal;
     const tabs = window.TabContextMenu.contextTab.multiselected
       ? window.gBrowser.selectedTabs
@@ -245,6 +253,7 @@ class nsZenSpaceRoutingManager {
           if (targetWorkspace) {
             workspaces.moveTabToWorkspace(newTab, targetWorkspace.uuid);
 
+            // Chromium: chrome.windows.getLastFocused(); Services.wm is Gecko-only.
             const mostRecentWindow =
               Services.wm.getMostRecentWindow("navigator:browser");
             const isOriginatingWindow = win === mostRecentWindow;
@@ -375,6 +384,8 @@ class nsZenSpaceRoutingManager {
    * @returns {Window|null} The instanced editor window
    */
   async openSpaceRoutingDialog(parentWindow) {
+    // Chromium: chrome.windows.create({url: <extension space-routing page>});
+    // gDialogBox + chrome:// xhtml below stay until the shell page lands.
     await parentWindow.gDialogBox.open(
       "chrome://browser/content/zen-components/windows/zen-space-routing.xhtml",
       {

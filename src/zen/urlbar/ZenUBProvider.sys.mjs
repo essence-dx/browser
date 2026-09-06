@@ -4,6 +4,10 @@
 
 import { ProvidersManager } from "moz-src:///browser/components/urlbar/UrlbarProvidersManager.sys.mjs";
 
+// Chromium migration (lane 3): urlbar provider registration.
+// Gecko: UrlbarProvidersManager/ProvidersManager. Chromium: chrome.omnibox
+// (see adapters/notes; omnibox keyword registration replaces provider classes).
+
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   /* eslint-disable mozilla/valid-lazy */

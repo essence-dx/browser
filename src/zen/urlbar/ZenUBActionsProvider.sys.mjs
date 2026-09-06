@@ -4,6 +4,11 @@
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 import { UrlbarProvider } from "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs";
+
+// Chromium migration (lane 3): UrlbarProvider -> chrome.omnibox shim.
+// Gecko: UrlbarProvider/UrlbarResult/UrlbarShared classes. Chromium: chrome.omnibox
+// onInputChanged/onInputEntered with the same suggestion payloads.
+// chrome:// and moz-src imports below stay until the omnibox shell lands.
 import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
 import { globalActions } from "resource:///modules/ZenUBGlobalActions.sys.mjs";
 import { zenUrlbarResultsLearner } from "./ZenUBResultsLearner.sys.mjs";

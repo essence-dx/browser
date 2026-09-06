@@ -6,9 +6,15 @@
 
 "use strict";
 
+// Chromium migration (lane 3): DnD prefs + tab strip via adapters.
+// Gecko: Services.prefs / gBrowser / Ci.nsIZenDragAndDrop (native window move).
+// Chromium: chrome.storage / chrome.tabs + HTML5 DnD / chrome.windows drag region
+// (see src/zen/adapters/prefs.mjs, adapters/tabs.mjs). Native XPCOM service below
+// stays until the shell drag shim lands.
+
 // Wrap in a block to prevent leaking to window scope.
 {
-  const isTab = element => gBrowser.isTab(element);
+  const isTab = element => gBrowser.isTab(element); // Chromium: chrome.tabs (element dataset).
   const isTabGroupLabel = element => gBrowser.isTabGroupLabel(element);
   const isEssentialsPromo = element =>
     element?.tagName.toUpperCase() == "ZEN-ESSENTIALS-PROMO";
@@ -75,6 +81,7 @@
     constructor(tabbrowserTabs) {
       super(tabbrowserTabs);
 
+      // Chromium: XPCOM lazy service has no equivalent; shell provides a drag shim.
       XPCOMUtils.defineLazyServiceGetter(
         this,
         "ZenDragAndDropService",
@@ -82,24 +89,28 @@
         Ci.nsIZenDragAndDrop
       );
 
+      // Chromium: chrome.storage (getBoolPref/getIntPref); XPCOM lazy pref is Gecko-only.
       XPCOMUtils.defineLazyPreferenceGetter(
         this,
         "_dndSplitEnabled",
         "zen.splitView.enable-drag-over-split",
         true
       );
+      // Chromium: chrome.storage (getBoolPref/getIntPref); XPCOM lazy pref is Gecko-only.
       XPCOMUtils.defineLazyPreferenceGetter(
         this,
         "_dndSplitThreshold",
         "zen.splitView.drag-over-split-threshold",
         25
       );
+      // Chromium: chrome.storage (getBoolPref/getIntPref); XPCOM lazy pref is Gecko-only.
       XPCOMUtils.defineLazyPreferenceGetter(
         this,
         "_dndSplitDelay",
         "zen.splitView.drag-over-split-delayMC",
         300
       );
+      // Chromium: chrome.storage (getBoolPref/getIntPref); XPCOM lazy pref is Gecko-only.
       XPCOMUtils.defineLazyPreferenceGetter(
         this,
         "_dndSwitchSpaceDelay",
@@ -107,6 +118,7 @@
         1000
       );
 
+      // Chromium: extension module URL; chrome:// dynamic import is Gecko-only.
       ChromeUtils.defineESModuleGetters(
         this,
         {
@@ -557,6 +569,7 @@
           dropElementSize
         );
 
+        // Chromium: chrome.storage (drag threshold pref); Services.prefs is Gecko-only.
         moveOverThreshold = gBrowser._tabGroupsEnabled
           ? Services.prefs.getIntPref(
               "browser.tabs.dragDrop.moveOverThresholdPercent"
@@ -639,6 +652,7 @@
         ".pinned-tabs-container-separator"
       );
       // Make sure to always return the separator at the start of the array
+      // Chromium: chrome.storage (newtab-button pref); Services.prefs is Gecko-only.
       return Services.prefs.getBoolPref("zen.view.show-newtab-button-top")
         ? [separator, gZenWorkspaces.activeWorkspaceElement.newTabButton]
         : [separator];
@@ -658,6 +672,7 @@
         return { isNearLeftEdge: false, isNearRightEdge: false };
       }
 
+      // Chromium: chrome.storage (dnd padding pref); Services.prefs is Gecko-only.
       const padding = Services.prefs.getIntPref(
         "zen.workspaces.dnd-switch-padding"
       );

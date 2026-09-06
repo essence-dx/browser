@@ -8,6 +8,11 @@ ChromeUtils.defineESModuleGetters(lazy, {
     "resource:///modules/zen/ZenLiveFoldersManager.sys.mjs",
 });
 
+// Chromium migration (lane 3): XUL menu construction via xul adapter.
+// Gecko: document.createXULElement. Chromium: document.createElement with the
+// same attributes (see src/zen/adapters/xul.mjs).
+import { createXULElementLocal } from "../adapters/xul.mjs";
+
 class nsZenLiveFoldersUI {
   init() {
     const popup = window.document
@@ -101,15 +106,15 @@ class nsZenLiveFoldersUI {
   #appendOptions(parentPopup, options, folderId) {
     for (const option of options) {
       if (option.type === "separator") {
-        parentPopup.appendChild(document.createXULElement("menuseparator"));
+        parentPopup.appendChild(createXULElementLocal("menuseparator"));
         continue;
       }
 
       if (option.options) {
-        const menu = document.createXULElement("menu");
+        const menu = createXULElementLocal("menu");
         this.#applyMenuItemAttributes(menu, option, folderId);
 
-        const subPopup = document.createXULElement("menupopup");
+        const subPopup = createXULElementLocal("menupopup");
         this.#appendOptions(subPopup, option.options, folderId);
 
         menu.appendChild(subPopup);
@@ -117,7 +122,7 @@ class nsZenLiveFoldersUI {
         continue;
       }
 
-      const menuItem = document.createXULElement("menuitem");
+      const menuItem = createXULElementLocal("menuitem");
       this.#applyMenuItemAttributes(menuItem, option, folderId);
 
       if (option.value !== undefined) {
@@ -205,6 +210,7 @@ class nsZenLiveFoldersUI {
       return "-";
     }
 
+    // Chromium: navigator.language; Services.locale is Gecko-only.
     const rtf = new Intl.RelativeTimeFormat(Services.locale.appLocaleAsBCP47, {
       numeric: "auto",
     });

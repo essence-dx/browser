@@ -5,6 +5,10 @@
 import { JSONFile } from "resource://gre/modules/JSONFile.sys.mjs";
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
+// Chromium migration (lane 3): record digest + id gen via WebCrypto.
+// Gecko: nsICryptoHash / Services.uuid. Chromium: crypto.subtle.digest /
+// crypto.randomUUID (see adapters/storage.mjs notes).
+
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -130,6 +134,7 @@ export function canonicalJSON(value) {
 const textEncoder = new TextEncoder();
 
 export function recordDigest(kind, data) {
+  // Chromium: crypto.subtle.digest("SHA-256", ...) + base64; nsICryptoHash is Gecko-only.
   const hasher = Cc["@mozilla.org/security/hash;1"].createInstance(
     Ci.nsICryptoHash
   );
@@ -207,6 +212,7 @@ class nsZenSpacesSyncModel {
     if (!create) {
       return null;
     }
+    // Chromium: crypto.randomUUID(); Services.uuid is Gecko-only.
     const guid = Services.uuid.generateUUID().toString().slice(1, -1);
     data.containers[id] = guid;
     this.#file.saveSoon();

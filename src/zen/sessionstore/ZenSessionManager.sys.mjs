@@ -5,6 +5,21 @@
 import { JSONFile } from "resource://gre/modules/JSONFile.sys.mjs";
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
+// Chromium migration (lane 3): prefs + session via adapters.
+// Gecko: Services.prefs / SessionStore. Chromium: chrome.storage / chrome.sessions
+// (see src/zen/adapters/prefs.mjs, adapters/session.mjs, adapters/storage.mjs).
+// JSONFile/Places/IOUtils persistence below maps to chrome.storage.local at the
+// storage layer; tab-restore calls (win.gBrowser / lazy.SessionStore.setTabState)
+// map to chrome.tabs/chrome.sessions.
+import {
+  getBoolPref,
+  getIntPref,
+  getStringPref,
+  setStringPref,
+} from "../adapters/prefs.mjs";
+import { getTabState, setTabState } from "../adapters/session.mjs";
+import { notifyObservers } from "../adapters/observers.mjs";
+
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -38,10 +53,7 @@ XPCOMUtils.defineLazyPreferenceGetter(
   3
 );
 
-const SHOULD_BACKUP_FILE = Services.prefs.getBoolPref(
-  "zen.session-store.backup-file",
-  true
-);
+const SHOULD_BACKUP_FILE = getBoolPref("zen.session-store.backup-file", true);
 const FILE_NAME = "zen-sessions.jsonlz4";
 
 const LAST_BUILD_ID_PREF = "zen.session-store.last-build-id";
@@ -105,10 +117,7 @@ export class nsZenSessionManager {
       path: this.#storeFilePath,
       compression: "lz4",
       backupTo,
-      useSizeHints: Services.prefs.getBoolPref(
-        "zen.session-store.use-size-hints",
-        true
-      ),
+      useSizeHints: getBoolPref("zen.session-store.use-size-hints", true),
     });
     this.log("Session file path:", this.#file.path);
     this.#deferredBackupTask = new lazy.DeferredTask(async () => {
@@ -305,9 +314,7 @@ export class nsZenSessionManager {
       this._shouldRunMigration = true;
       await this.#getDataFromDBForMigration();
     }
-    if (
-      Services.prefs.getBoolPref("zen.session-store.log-tab-entries", false)
-    ) {
+    if (getBoolPref("zen.session-store.log-tab-entries", false)) {
       for (const tab of this.#sidebarWithoutCloning.tabs || []) {
         this.log("Tab entry in session file:", tab);
       }
@@ -317,7 +324,7 @@ export class nsZenSessionManager {
 
   get #shouldRestoreOnlyPinned() {
     let buildId = Services.appinfo.platformBuildID;
-    let lastBuildId = Services.prefs.getStringPref(LAST_BUILD_ID_PREF, "");
+    let lastBuildId = getStringPref(LAST_BUILD_ID_PREF, "");
     let buildIdChanged = buildId !== lastBuildId;
     if (buildIdChanged) {
       // If the build ID has changed since the last session, it means the user has updated the app,
@@ -329,12 +336,11 @@ export class nsZenSessionManager {
           lastBuildId,
         }
       );
-      Services.prefs.setStringPref(LAST_BUILD_ID_PREF, buildId);
+      setStringPref(LAST_BUILD_ID_PREF, buildId);
       return false;
     }
     return (
-      Services.prefs.getIntPref("browser.startup.page", 1) !==
-        BROWSER_STARTUP_RESUME_SESSION ||
+      getIntPref("browser.startup.page", 1) !== BROWSER_STARTUP_RESUME_SESSION ||
       lazy.PrivateBrowsingUtils.permanentPrivateBrowsing
     );
   }
@@ -342,7 +348,7 @@ export class nsZenSessionManager {
   get #shouldRestoreFromCrash() {
     return (
       lazy.SessionStartup.previousSessionCrashed &&
-      Services.prefs.getBoolPref("browser.sessionstore.resume_from_crash")
+      getBoolPref("browser.sessionstore.resume_from_crash", false)
     );
   }
 
@@ -376,7 +382,7 @@ export class nsZenSessionManager {
       }
       return initialState;
     }
-    const allowRestoreUnsynced = Services.prefs.getBoolPref(
+    const allowRestoreUnsynced = getBoolPref(
       "zen.session-store.restore-unsynced-windows",
       true
     );
@@ -612,7 +618,7 @@ export class nsZenSessionManager {
     this.#collectWindowData(windows);
     // Let interested consumers (e.g. Firefox Sync) know fresh sidebar data
     // is available, without this module knowing anything about them.
-    Services.obs.notifyObservers(null, "zen-sidebar-data-collected");
+    notifyObservers(null, "zen-sidebar-data-collected");
     // This would save the data to disk asynchronously or when quitting the app.
     let sidebar = this.#sidebarWithoutCloning;
     this.#file.data = sidebar;
@@ -980,10 +986,8 @@ export class nsZenSessionManager {
           ) {
             return;
           }
-          lazy.SessionStore.setTabState(
-            targetTab,
-            lazy.SessionStore.getTabState(tab)
-          );
+          // Chromium: setTabState/getTabState via adapters/session.mjs.
+          setTabState(targetTab, getTabState(tab));
         })
         .catch(e =>
           console.error("ZenSessionManager: Failed to refresh tab state", e)

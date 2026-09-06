@@ -14,6 +14,11 @@ ChromeUtils.defineLazyGetter(lazy, "overlayLocalization", () => {
   return new Localization(["browser/zen-boosts.ftl"], true);
 });
 
+// Chromium migration (lane 3): dissolve pref via adapter.
+// Gecko: Services.prefs. Chromium: chrome.storage (see adapters/prefs.mjs).
+// chrome:// stylesheet link in markup below becomes extension content-script CSS.
+import { getBoolPref } from "../adapters/prefs.mjs";
+
 export class ZapOverlay {
   document = null;
   window = null;
@@ -107,6 +112,7 @@ export class ZapOverlay {
   }
 
   get content() {
+    // Chromium: content WindowProxy stays alive; Cu.isDeadWrapper is Gecko-only.
     if (!this.#content || Cu.isDeadWrapper(this.#content)) {
       return null;
     }
@@ -177,9 +183,7 @@ export class ZapOverlay {
    * @param {string} cssPath The css selector of the zap
    */
   #handleZap(cssPath) {
-    const useDissolve = Services.prefs.getBoolPref(
-      "zen.boosts.dissolve-on-zap"
-    );
+    const useDissolve = getBoolPref("zen.boosts.dissolve-on-zap", false);
     if (!this.window.gReduceMotion && useDissolve) {
       const elements = this.document.querySelectorAll(cssPath);
 

@@ -417,6 +417,7 @@ export class ZenBoostsChild extends JSWindowActorChild {
    */
   #loadStyleSheet(styleSheet) {
     const browsingContext = this.browsingContext;
+    // Chromium: chrome.scripting.insertCSS; nsIStyleSheetService/winUtils.loadSheet are Gecko-only.
     styleSheet.uri = Services.io.newURI(styleSheet.uri);
 
     if (this.#currentSheet?.uuid !== styleSheet.uuid) {

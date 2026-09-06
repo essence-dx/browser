@@ -13,6 +13,14 @@ import {
 
 import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
 
+// Chromium migration (lane 3): prefs + tab state via adapters.
+// Gecko: Services.prefs / win.SessionStore. Chromium: chrome.storage /
+// chrome.sessions (see src/zen/adapters/prefs.mjs, adapters/session.mjs).
+// Tab strip calls (win.gBrowser.*) map to chrome.tabs at the shell layer;
+// confirm dialogs map to extension UI.
+import { getBoolPref, setBoolPref } from "../adapters/prefs.mjs";
+import { getTabState, setTabState } from "../adapters/session.mjs";
+
 const lazy = {};
 
 XPCOMUtils.defineLazyPreferenceGetter(
@@ -200,10 +208,10 @@ class nsZenSpacesSyncApplier {
    * @param {Window} win
    */
   #maybePlayFirstSyncAnimation(win) {
-    if (Services.prefs.getBoolPref(FIRST_SYNC_ANIMATION_PREF, false)) {
+    if (getBoolPref(FIRST_SYNC_ANIMATION_PREF, false)) {
       return;
     }
-    Services.prefs.setBoolPref(FIRST_SYNC_ANIMATION_PREF, true);
+    setBoolPref(FIRST_SYNC_ANIMATION_PREF, true);
     win.gZenStartup.playWindowSweepAnimation();
   }
 
@@ -401,6 +409,7 @@ class nsZenSpacesSyncApplier {
       { id: "zen-workspaces-remote-delete-title" },
       { id: "zen-workspaces-remote-delete-body", args: { name } },
     ]);
+    // Chromium: extension confirm dialog; Services.prompt is Gecko-only.
     const result = await Services.prompt.asyncConfirmEx(
       win.browsingContext,
       Services.prompt.MODAL_TYPE_WINDOW,
@@ -676,7 +685,8 @@ class nsZenSpacesSyncApplier {
    */
   #retargetUnloadedTab(win, tab, data, previousPinUrl) {
     try {
-      const state = JSON.parse(win.SessionStore.getTabState(tab));
+      // Chromium: getTabState(tab) / chrome.storage.session (see adapters/session.mjs).
+      const state = JSON.parse(getTabState(tab));
       const entries = state.entries || [];
       let currentUrl = null;
       if (entries.length) {
@@ -707,7 +717,8 @@ class nsZenSpacesSyncApplier {
       state.index = 1;
       state.image = syncableIconUrl(data.icon) || undefined;
       delete state.scroll;
-      win.SessionStore.setTabState(tab, state);
+      // Chromium: setTabState(tab, state) / chrome.storage.session.
+      setTabState(tab, state);
     } catch (e) {
       console.error("ZenSpacesSync: failed to retarget unloaded tab", e);
     }

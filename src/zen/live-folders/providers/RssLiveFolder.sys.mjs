@@ -4,6 +4,10 @@
 
 import { nsZenLiveFolderProvider } from "resource:///modules/zen/ZenLiveFolder.sys.mjs";
 
+// Chromium migration (lane 3): feed parse + favicon via fetch/DOM.
+// Gecko: Services.io.newURI + Places favicons + Services.prompt. Chromium: URL +
+// favicon service / link-rel-icon + extension prompt (shell layer).
+
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
@@ -63,6 +67,7 @@ export class nsRssLiveFolderProvider extends nsZenLiveFolderProvider {
             return false;
           }
           try {
+            // Chromium: new URL(item.url); Services.io.newURI is Gecko-only.
             const parsed = Services.io.newURI(item.url);
             if (parsed.scheme !== "http" && parsed.scheme !== "https") {
               return false;
@@ -81,6 +86,7 @@ export class nsRssLiveFolderProvider extends nsZenLiveFolderProvider {
       for (let item of items) {
         if (item.url) {
           try {
+            // Chromium: new URL(item.url); Services.io.newURI is Gecko-only.
             const url = Services.io.newURI(item.url);
             const favicon =
               await lazy.PlacesUtils.favicons.getFaviconForPage(url);
@@ -209,6 +215,7 @@ export class nsRssLiveFolderProvider extends nsZenLiveFolderProvider {
         )?.trim() || "";
 
       const faviconPageUrl = feedLink ? new URL(feedLink, url).href : url;
+      // Chromium: favicon link-rel-icon lookup; Places favicons is Gecko-only.
       let favicon = await lazy.PlacesUtils.favicons.getFaviconForPage(
         Services.io.newURI(faviconPageUrl)
       );
@@ -232,6 +239,7 @@ export class nsRssLiveFolderProvider extends nsZenLiveFolderProvider {
     const [prompt] = await lazy.l10n.formatValues([
       "zen-live-folder-rss-prompt-feed-url",
     ]);
+    // Chromium: extension prompt dialog; Services.prompt is Gecko-only.
     const promptOk = Services.prompt.prompt(window, prompt, null, input, null, {
       value: null,
     });

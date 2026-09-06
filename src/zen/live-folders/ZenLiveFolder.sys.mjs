@@ -1,6 +1,10 @@
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
+// Chromium migration (lane 3): network fetch via fetch().
+// Gecko: NetUtil channels + scriptSecurityManager principals + nsIHttpChannel.
+// Chromium: fetch() with cookies (see adapters/storage.mjs notes); channel
+// QueryInterface/Ci/Cr below stay until the fetch shell lands.
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   NetUtil: "resource://gre/modules/NetUtil.sys.mjs",
@@ -136,6 +140,7 @@ export class nsZenLiveFolderProvider {
         userContextId = space.containerTabId || 0;
       }
     }
+    // Chromium: fetch(); content principals + nsIContentPolicy are Gecko-only.
     const principal = Services.scriptSecurityManager.createContentPrincipal(
       uri,
       { userContextId }
