@@ -6,24 +6,19 @@ import {
   Store,
   SyncEngine,
   Tracker,
-} from "resource://services-sync/engines.sys.mjs";
-import { CryptoWrapper } from "resource://services-sync/record.sys.mjs";
-import { SCORE_INCREMENT_XLARGE } from "resource://services-sync/constants.sys.mjs";
+  CryptoWrapper,
+  SCORE_INCREMENT_XLARGE,
+} from "./ZenSyncEngineShim.mjs";
 import {
   SIDEBAR_COLLECTED_TOPIC,
   syncLog,
   ZenSpacesSyncModel,
-} from "resource:///modules/zen/ZenSpacesSyncModel.sys.mjs";
+} from "./ZenSpacesSyncModel.sys.mjs";
 
-// Chromium migration (lane 3): Weave SyncEngine -> chrome.storage.sync shim.
-// Observer bus via adapter (Gecko: Services.obs, Chromium: chrome.events).
 import { addObserver, removeObserver } from "../adapters/observers.mjs";
+import { ZenSpacesSyncApplier } from "./ZenSpacesSyncApplier.sys.mjs";
 
-const lazy = {};
-
-ChromeUtils.defineESModuleGetters(lazy, {
-  ZenSpacesSyncApplier: "resource:///modules/zen/ZenSpacesSyncApplier.sys.mjs",
-});
+const lazy = { ZenSpacesSyncApplier };
 
 const TRACKED_TOPICS = [
   SIDEBAR_COLLECTED_TOPIC,
@@ -54,7 +49,7 @@ class ZenSpacesSyncStore extends Store {
 
   async createRecord(id, collection) {
     const record = new ZenSpacesSyncRecord(collection, id);
-    const projected = ZenSpacesSyncModel.projectRecord(id);
+    const projected = await ZenSpacesSyncModel.projectRecord(id);
     if (!projected) {
       record.deleted = true;
       return record;
@@ -106,7 +101,7 @@ class ZenSpacesSyncTracker extends Tracker {
     }
   }
 
-  observe(subject, topic) {
+  async observe(subject, topic) {
     if (this.ignoreAll) {
       return;
     }
@@ -114,7 +109,7 @@ class ZenSpacesSyncTracker extends Tracker {
       ZenSpacesSyncModel.invalidate();
     }
     try {
-      if (ZenSpacesSyncModel.hasPendingChanges()) {
+      if (await ZenSpacesSyncModel.hasPendingChanges()) {
         syncLog(`tracker: pending changes after ${topic}, requesting sync`);
         this.score += SCORE_INCREMENT_XLARGE;
       }
@@ -180,6 +175,6 @@ export class ZenSpacesSyncEngine extends SyncEngine {
   async trackRemainingChanges() {}
 
   async _onRecordsWritten(succeeded) {
-    ZenSpacesSyncModel.markUploaded(succeeded);
+    await ZenSpacesSyncModel.markUploaded(succeeded);
   }
 }

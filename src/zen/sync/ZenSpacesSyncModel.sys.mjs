@@ -2,36 +2,27 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { JSONFile } from "resource://gre/modules/JSONFile.sys.mjs";
-import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+import { ZenSessionData } from "../sessionstore/ZenSessionManager.sys.mjs";
+import { ZenLiveFoldersManager } from "../live-folders/ZenLiveFoldersManager.sys.mjs";
+import { getBoolPref } from "../adapters/prefs.mjs";
+import { readJSON, writeJSON, joinPath, getProfileDir } from "../adapters/storage.mjs";
 
-// Chromium migration (lane 3): record digest + id gen via WebCrypto.
-// Gecko: nsICryptoHash / Services.uuid. Chromium: crypto.subtle.digest /
-// crypto.randomUUID (see adapters/storage.mjs notes).
-
-const lazy = {};
-
-ChromeUtils.defineESModuleGetters(lazy, {
-  ZenSessionStore: "resource:///modules/zen/ZenSessionManager.sys.mjs",
-  ZenLiveFoldersManager:
-    "resource:///modules/zen/ZenLiveFoldersManager.sys.mjs",
-  ContextualIdentityService:
-    "moz-src:///toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs",
-});
-
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "syncDebug",
-  "zen.spaces-sync.debug",
-  false
-);
-
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "syncNormalTabs",
-  "zen.spaces-sync.normal-tabs",
-  false
-);
+const lazy = {
+  ZenSessionData,
+  ZenLiveFoldersManager,
+  ContextualIdentityService: {
+    getPublicIdentityFromId: () => null,
+    create: name => ({ userContextId: 0, name }),
+    update: () => {},
+    remove: () => {},
+  },
+  get syncDebug() {
+    return getBoolPref("zen.spaces-sync.debug", false);
+  },
+  get syncNormalTabs() {
+    return getBoolPref("zen.spaces-sync.normal-tabs", false);
+  },
+};
 
 /**
  * Debug logging for the whole Spaces sync pipeline.
@@ -87,8 +78,8 @@ export function syncableIconUrl(icon) {
   }
   if (icon.startsWith("moz-remote-image:")) {
     try {
-      const uri = Services.io.newURI(icon);
-      icon = new URLSearchParams(uri.query).get("url") || "";
+      const uri = new URL(icon);
+      icon = new URLSearchParams(uri.search).get("url") || "";
     } catch (e) {
       return "";
     }
@@ -133,53 +124,77 @@ export function canonicalJSON(value) {
  */
 const textEncoder = new TextEncoder();
 
+const _digestCache = new Map();
+
 export function recordDigest(kind, data) {
-  // Chromium: crypto.subtle.digest("SHA-256", ...) + base64; nsICryptoHash is Gecko-only.
-  const hasher = Cc["@mozilla.org/security/hash;1"].createInstance(
-    Ci.nsICryptoHash
-  );
-  hasher.init(Ci.nsICryptoHash.SHA256);
-  const bytes = textEncoder.encode(canonicalJSON({ kind, data }));
-  hasher.update(bytes, bytes.length);
-  return hasher.finish(/* base64 = */ true);
+  const key = canonicalJSON({ kind, data });
+  let digest = _digestCache.get(key);
+  if (digest === undefined) {
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+      hash = (Math.imul(hash, 31) + key.charCodeAt(i)) | 0;
+    }
+    digest = `fnv1a-${(hash >>> 0).toString(16)}`;
+    _digestCache.set(key, digest);
+  }
+  if (typeof crypto?.subtle?.digest === "function") {
+    crypto.subtle
+      .digest("SHA-256", textEncoder.encode(key))
+      .then(buffer => {
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        for (const byte of bytes) {
+          binary += String.fromCharCode(byte);
+        }
+        _digestCache.set(key, btoa(binary));
+      })
+      .catch(() => {});
+  }
+  return digest;
 }
 
 /**
  * Owns the synced-data model for the Spaces engine.
  */
 class nsZenSpacesSyncModel {
-  #file = null;
   #cache = null;
+  #saveTimer = 0;
 
-  #data() {
-    if (!this.#file) {
-      this.#file = new JSONFile({
-        path: PathUtils.join(PathUtils.profileDir, STORE_FILE_NAME),
-        dataPostProcessor: data => {
-          if (data.version !== STORE_VERSION) {
-            // Drop the uploaded snapshot so everything re-diffs against
-            // the (also wiped) server, but keep the container identity mappings.
-            data.uploaded = {};
-          }
-          data.version = STORE_VERSION;
-          data.uploaded ||= {};
-          data.containers ||= {};
-          // The container map used to be keyed by guid. It is keyed by
-          // userContextId now so that registering a guid replaces any
-          // previous one for the same container. Flip old stores over
-          // (old values are numeric ids, new values are guid strings).
-          for (const [key, value] of Object.entries(data.containers)) {
-            if (typeof value === "number") {
-              delete data.containers[key];
-              data.containers[value] = key;
-            }
-          }
-          return data;
-        },
-      });
-      this.#file.ensureDataReady();
+  #storePath() {
+    return joinPath(getProfileDir(), STORE_FILE_NAME);
+  }
+
+  #normalizeData(data) {
+    data = data && typeof data === "object" ? data : {};
+    if (data.version !== STORE_VERSION) {
+      data.uploaded = {};
     }
-    return this.#file.data;
+    data.version = STORE_VERSION;
+    data.uploaded ||= {};
+    data.containers ||= {};
+    for (const [key, value] of Object.entries(data.containers)) {
+      if (typeof value === "number") {
+        delete data.containers[key];
+        data.containers[value] = key;
+      }
+    }
+    return data;
+  }
+
+  #saveSoon() {
+    clearTimeout(this.#saveTimer);
+    this.#saveTimer = setTimeout(async () => {
+      if (this.#cache) {
+        await writeJSON(this.#storePath(), this.#cache);
+      }
+    }, 500);
+  }
+
+  async #data() {
+    if (!this.#cache) {
+      this.#cache = this.#normalizeData(await readJSON(this.#storePath()));
+    }
+    return this.#cache;
   }
 
   invalidate() {
@@ -188,17 +203,17 @@ class nsZenSpacesSyncModel {
 
   /* Mark: container identity */
 
-  guidForContextId(userContextId, { create = false } = {}) {
+  async guidForContextId(userContextId, { create = false } = {}) {
     const id = Number(userContextId);
     if (!Number.isSafeInteger(id) || id <= 0) {
       return null;
     }
-    const data = this.#data();
+    const data = await this.#data();
     if (!lazy.ContextualIdentityService.getPublicIdentityFromId(id)) {
       // A space or tab still pointing at a container that was deleted.
       if (id in data.containers) {
         delete data.containers[id];
-        this.#file.saveSoon();
+        this.#saveSoon();
       }
       return null;
     }
@@ -212,18 +227,17 @@ class nsZenSpacesSyncModel {
     if (!create) {
       return null;
     }
-    // Chromium: crypto.randomUUID(); Services.uuid is Gecko-only.
-    const guid = Services.uuid.generateUUID().toString().slice(1, -1);
+    const guid = crypto.randomUUID();
     data.containers[id] = guid;
-    this.#file.saveSoon();
+    this.#saveSoon();
     return guid;
   }
 
-  contextIdForGuid(guid) {
+  async contextIdForGuid(guid) {
     if (typeof guid !== "string" || !guid) {
       return null;
     }
-    const data = this.#data();
+    const data = await this.#data();
     for (const [id, mapped] of Object.entries(data.containers)) {
       if (mapped === guid) {
         const contextId = Number(id);
@@ -231,7 +245,7 @@ class nsZenSpacesSyncModel {
           return contextId;
         }
         delete data.containers[id];
-        this.#file.saveSoon();
+        this.#saveSoon();
         return null;
       }
     }
@@ -253,17 +267,17 @@ class nsZenSpacesSyncModel {
    * @param {string} guid
    * @param {number} userContextId
    */
-  registerContainerGuid(guid, userContextId) {
-    this.#data().containers[userContextId] = guid;
-    this.#file.saveSoon();
+  async registerContainerGuid(guid, userContextId) {
+    (await this.#data()).containers[userContextId] = guid;
+    this.#saveSoon();
   }
 
-  forgetContainerGuid(guid) {
-    const data = this.#data();
+  async forgetContainerGuid(guid) {
+    const data = await this.#data();
     for (const [id, mapped] of Object.entries(data.containers)) {
       if (mapped === guid) {
         delete data.containers[id];
-        this.#file.saveSoon();
+        this.#saveSoon();
         return;
       }
     }
@@ -494,7 +508,7 @@ class nsZenSpacesSyncModel {
           url: identity.url,
           title: identity.title,
           icon: identity.icon,
-          containerGuid: this.guidForContextId(tab.userContextId, {
+          containerGuid: await this.guidForContextId(tab.userContextId, {
             create: true,
           }),
           essential,
@@ -510,8 +524,8 @@ class nsZenSpacesSyncModel {
     }
   }
 
-  projections() {
-    const sidebar = lazy.ZenSessionStore.getSidebarData() || {};
+  async projections() {
+    const sidebar = (await lazy.ZenSessionData.getSidebarData()) || {};
     const stamp = sidebar.lastCollected || 0;
     if (this.#cache && this.#cache.stamp === stamp) {
       return this.#cache.map;
@@ -548,7 +562,7 @@ class nsZenSpacesSyncModel {
       if (!identity.name) {
         continue;
       }
-      const guid = this.guidForContextId(identity.userContextId, {
+      const guid = await this.guidForContextId(identity.userContextId, {
         create: true,
       });
       if (!guid) {
@@ -578,7 +592,7 @@ class nsZenSpacesSyncModel {
           name: space.name ?? "",
           icon: space.icon ?? null,
           theme: space.theme ?? null,
-          containerGuid: this.guidForContextId(space.containerTabId, {
+          containerGuid: await this.guidForContextId(space.containerTabId, {
             create: true,
           }),
           children: this.#childSequence(ctx, { space: uuid }),
@@ -661,8 +675,8 @@ class nsZenSpacesSyncModel {
    * (live folders whose provider config isn't available yet). The diff must
    * not read their absence as a deletion.
    */
-  #pendingIds() {
-    this.projections();
+  async #pendingIds() {
+    await this.projections();
     return this.#cache.pending;
   }
 
@@ -673,8 +687,8 @@ class nsZenSpacesSyncModel {
    * sync cycle (tracker observe, changed-id computation, upload bookkeeping)
    * and only needs to hash again after a fresh sidebar collection.
    */
-  #digestAll() {
-    const map = this.projections();
+  async #digestAll() {
+    const map = await this.projections();
     if (this.#digestCache?.map === map) {
       return this.#digestCache.digests;
     }
@@ -688,20 +702,20 @@ class nsZenSpacesSyncModel {
 
   /* Mark: engine-facing API */
 
-  getAllRecordIds() {
+  async getAllRecordIds() {
     const ids = {};
-    for (const id of this.projections().keys()) {
+    for (const id of (await this.projections()).keys()) {
       ids[id] = true;
     }
     return ids;
   }
 
-  itemExists(id) {
-    return this.projections().has(id);
+  async itemExists(id) {
+    return (await this.projections()).has(id);
   }
 
-  projectRecord(id) {
-    return this.projections().get(id) ?? null;
+  async projectRecord(id) {
+    return (await this.projections()).get(id) ?? null;
   }
 
   /**
@@ -709,8 +723,9 @@ class nsZenSpacesSyncModel {
    * against the uploaded snapshot would tombstone every synced item. An
    * initialized sidebar always holds at least one space.
    */
-  #sidebarReady() {
-    return !!lazy.ZenSessionStore.getSidebarData()?.spaces?.length;
+  async sidebarReady() {
+    const data = await lazy.ZenSessionData.getSidebarData();
+    return !!data?.spaces?.length;
   }
 
   /**
@@ -718,13 +733,13 @@ class nsZenSpacesSyncModel {
    * server acknowledged. Ids present locally with different content are
    * modified; ids only present in the uploaded snapshot are deletions.
    */
-  computeChangedIDs() {
-    if (!this.#sidebarReady()) {
+  async computeChangedIDs() {
+    if (!(await this.sidebarReady())) {
       return {};
     }
-    const uploaded = this.#data().uploaded;
-    const current = this.#digestAll();
-    const pending = this.#pendingIds();
+    const uploaded = (await this.#data()).uploaded;
+    const current = await this.#digestAll();
+    const pending = await this.#pendingIds();
     const now = Date.now() / 1000;
     const changes = {};
     for (const [id, digest] of current) {
@@ -738,7 +753,7 @@ class nsZenSpacesSyncModel {
       }
     }
     if (lazy.syncDebug && Object.keys(changes).length) {
-      const map = this.projections();
+      const map = await this.projections();
       syncLog(
         "outgoing diff:",
         Object.keys(changes).map(id =>
@@ -749,13 +764,13 @@ class nsZenSpacesSyncModel {
     return changes;
   }
 
-  hasPendingChanges() {
-    if (!this.#sidebarReady()) {
+  async hasPendingChanges() {
+    if (!(await this.sidebarReady())) {
       return false;
     }
-    const uploaded = this.#data().uploaded;
-    const current = this.#digestAll();
-    const pending = this.#pendingIds();
+    const uploaded = (await this.#data()).uploaded;
+    const current = await this.#digestAll();
+    const pending = await this.#pendingIds();
     for (const [id, digest] of current) {
       if (uploaded[id] !== digest) {
         return true;
@@ -776,8 +791,8 @@ class nsZenSpacesSyncModel {
    * @param {Array<string>} ids
    */
   markUploaded(ids) {
-    const data = this.#data();
-    const current = this.#digestAll();
+    const data = await this.#data();
+    const current = await this.#digestAll();
     for (const id of ids) {
       if (current.has(id)) {
         data.uploaded[id] = current.get(id);
@@ -791,7 +806,7 @@ class nsZenSpacesSyncModel {
         ids.map(id => (current.has(id) ? id : `${id} (tombstone)`))
       );
     }
-    this.#file.saveSoon();
+    this.#saveSoon();
   }
 
   /**
@@ -803,8 +818,8 @@ class nsZenSpacesSyncModel {
    * @param {string} id
    * @param {?object} cleartext - null for tombstones.
    */
-  noteApplied(id, cleartext) {
-    const data = this.#data();
+  async noteApplied(id, cleartext) {
+    const data = await this.#data();
     if (!cleartext) {
       delete data.uploaded[id];
     } else {
@@ -813,7 +828,7 @@ class nsZenSpacesSyncModel {
     syncLog(
       `acknowledged incoming ${cleartext ? cleartext.kind : "tombstone"} ${id}`
     );
-    this.#file.saveSoon();
+    this.#saveSoon();
   }
 }
 

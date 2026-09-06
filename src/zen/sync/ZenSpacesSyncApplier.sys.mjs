@@ -9,37 +9,35 @@ import {
   syncableIconUrl,
   syncLog,
   ZenSpacesSyncModel,
-} from "resource:///modules/zen/ZenSpacesSyncModel.sys.mjs";
+} from "./ZenSpacesSyncModel.sys.mjs";
 
-import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
-
-// Chromium migration (lane 3): prefs + tab state via adapters.
-// Gecko: Services.prefs / win.SessionStore. Chromium: chrome.storage /
-// chrome.sessions (see src/zen/adapters/prefs.mjs, adapters/session.mjs).
-// Tab strip calls (win.gBrowser.*) map to chrome.tabs at the shell layer;
-// confirm dialogs map to extension UI.
 import { getBoolPref, setBoolPref } from "../adapters/prefs.mjs";
 import { getTabState, setTabState } from "../adapters/session.mjs";
+import {
+  getTabs,
+  pinTab,
+  unpinTab,
+  createTab,
+  removeTab,
+} from "../adapters/tabs.mjs";
+import { ZenWindowSync } from "../sessionstore/ZenWindowSync.sys.mjs";
+import { ZenLiveFoldersManager } from "../live-folders/ZenLiveFoldersManager.sys.mjs";
 
-const lazy = {};
-
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "syncNormalTabs",
-  "zen.spaces-sync.normal-tabs",
-  false
-);
-
-ChromeUtils.defineESModuleGetters(lazy, {
-  SessionSaver: "resource:///modules/sessionstore/SessionSaver.sys.mjs",
-  E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
-  TabStateCache: "resource:///modules/sessionstore/TabStateCache.sys.mjs",
-  ZenWindowSync: "resource:///modules/zen/ZenWindowSync.sys.mjs",
-  ZenLiveFoldersManager:
-    "resource:///modules/zen/ZenLiveFoldersManager.sys.mjs",
-  ContextualIdentityService:
-    "moz-src:///toolkit/components/contextualidentity/ContextualIdentityService.sys.mjs",
-});
+const lazy = {
+  get syncNormalTabs() {
+    return getBoolPref("zen.spaces-sync.normal-tabs", false);
+  },
+  SessionSaver: { saveState: () => {} },
+  E10SUtils: {
+    serializePrincipal: principal => btoa(JSON.stringify(principal ?? {})),
+  },
+  TabStateCache: { update: () => {} },
+  ZenWindowSync,
+  ZenLiveFoldersManager,
+  ContextualIdentityService: {
+    getPublicIdentityFromId: () => null,
+  },
+};
 
 const FIRST_SYNC_ANIMATION_PREF = "zen.spaces-sync.first-sync-animation-shown";
 
@@ -59,11 +57,11 @@ class nsZenSpacesSyncApplier {
    * @param {?string} containerGuid
    * @returns {number}
    */
-  #resolveContainerId(containerGuid) {
+  async #resolveContainerId(containerGuid) {
     if (!containerGuid) {
       return 0;
     }
-    const mapped = ZenSpacesSyncModel.contextIdForGuid(containerGuid);
+    const mapped = await ZenSpacesSyncModel.contextIdForGuid(containerGuid);
     if (mapped === null) {
       throw new Error(`unknown container guid ${containerGuid}`);
     }
@@ -146,7 +144,7 @@ class nsZenSpacesSyncApplier {
       console.error(`ZenSpacesSync: failed to apply ${record.id}:`, e);
     };
 
-    const deletions = this.#applyContainers(incoming, fail);
+    const deletions = await this.#applyContainers(incoming, fail);
 
     const win = lazy.ZenWindowSync.firstSyncedWindow;
     if (!win) {
@@ -170,22 +168,22 @@ class nsZenSpacesSyncApplier {
       win.gZenFolders._sessionRestoring = true;
       try {
         const removals = this.#routeTombstones(win, deletions);
-        this.#deleteTabs(win, removals.tabs, fail);
-        this.#deleteSplits(win, removals.splits, fail);
+        await this.#deleteTabs(win, removals.tabs, fail);
+        await this.#deleteSplits(win, removals.splits, fail);
         await this.#applySpaces(win, incoming.spaces, fail);
         await this.#applyFolders(win, incoming.folders, fail);
-        this.#applyTabs(win, incoming.tabs, fail);
-        this.#applySplits(win, incoming.splits, fail);
+        await this.#applyTabs(win, incoming.tabs, fail);
+        await this.#applySplits(win, incoming.splits, fail);
         await this.#deleteFolders(win, removals.folders, fail);
         await this.#deleteSpaces(win, removals.spaces, fail);
-        this.#applyOrdering(win, incoming, fail);
+        await this.#applyOrdering(win, incoming, fail);
       } finally {
         delete win.gZenFolders._sessionRestoring;
       }
       // Collect the session soon so the stored sidebar (and with it the
       // sync projections) reflects the applied state instead of re-uploading
       // the pre-apply one.
-      lazy.SessionSaver.runDelayed();
+      lazy.SessionSaver.saveState();
     }
 
     ZenSpacesSyncModel.invalidate();
@@ -193,7 +191,7 @@ class nsZenSpacesSyncApplier {
       if (!handled.has(record) || failed.has(record.id)) {
         continue;
       }
-      ZenSpacesSyncModel.noteApplied(
+      await ZenSpacesSyncModel.noteApplied(
         record.id,
         record.deleted ? null : record.cleartext
       );
@@ -228,7 +226,7 @@ class nsZenSpacesSyncApplier {
     const spaces = win.gZenWorkspaces.getWorkspaces();
     for (const entry of deletions) {
       const el = this.#itemIn(win, entry.key);
-      if (win.gBrowser.isTab(el)) {
+      if (el?.dataset?.zenTabId || el?.isTab) {
         routed.tabs.push(entry);
       } else if (el?.isZenFolder) {
         routed.folders.push(entry);
@@ -258,13 +256,13 @@ class nsZenSpacesSyncApplier {
 
   /* Mark: containers */
 
-  #applyContainers(incoming, fail) {
+  async #applyContainers(incoming, fail) {
     for (const { key: guid, data, record } of incoming.containers) {
       try {
         if (!data.name) {
           continue;
         }
-        const mapped = ZenSpacesSyncModel.contextIdForGuid(guid);
+        const mapped = await ZenSpacesSyncModel.contextIdForGuid(guid);
         const existing =
           mapped !== null
             ? lazy.ContextualIdentityService.getPublicIdentityFromId(mapped)
@@ -294,7 +292,7 @@ class nsZenSpacesSyncApplier {
 
     const rest = [];
     for (const entry of incoming.deleted) {
-      const mapped = ZenSpacesSyncModel.contextIdForGuid(entry.key);
+      const mapped = await ZenSpacesSyncModel.contextIdForGuid(entry.key);
       if (mapped === null) {
         rest.push(entry);
         continue;
@@ -313,7 +311,7 @@ class nsZenSpacesSyncApplier {
 
   /* Mark: spaces */
 
-  async #applySpaces(win, spaces, fail) {
+  async async #applySpaces(win, spaces, fail) {
     if (!spaces.length) {
       return;
     }
@@ -377,7 +375,7 @@ class nsZenSpacesSyncApplier {
     }
   }
 
-  async #deleteSpaces(win, removals, fail) {
+  async async #deleteSpaces(win, removals, fail) {
     for (const { key: uuid, record } of removals) {
       try {
         const spaces = win.gZenWorkspaces.getWorkspaces();
@@ -409,25 +407,12 @@ class nsZenSpacesSyncApplier {
       { id: "zen-workspaces-remote-delete-title" },
       { id: "zen-workspaces-remote-delete-body", args: { name } },
     ]);
-    // Chromium: extension confirm dialog; Services.prompt is Gecko-only.
-    const result = await Services.prompt.asyncConfirmEx(
-      win.browsingContext,
-      Services.prompt.MODAL_TYPE_WINDOW,
-      title,
-      body,
-      Services.prompt.STD_YES_NO_BUTTONS,
-      null,
-      null,
-      null,
-      null,
-      false
-    );
-    return result.get("buttonNumClicked") === 0;
+    return win.confirm(`${title}\n\n${body}`);
   }
 
   /* Mark: folders */
 
-  async #applyFolders(win, folders, fail) {
+  async async #applyFolders(win, folders, fail) {
     // Parents before children so nesting targets exist.
     const depths = new Map(folders.map(f => [f.key, f.data.parentFolderId]));
     const depthOf = key => {
@@ -483,7 +468,7 @@ class nsZenSpacesSyncApplier {
         const currentParent = folder.group;
         if ((currentParent?.id || null) !== (data.parentFolderId || null)) {
           if (desiredParent?.isZenFolder) {
-            win.gBrowser.zenHandleTabMove(folder, () => {
+            win.gZenTabMoves.moveElement(folder, () => {
               if (desiredParent.tabs.length) {
                 desiredParent.tabs[0].after(folder);
               } else {
@@ -495,7 +480,7 @@ class nsZenSpacesSyncApplier {
             const container =
               win.gZenWorkspaces.workspaceElement(ws)?.pinnedTabsContainer;
             if (container) {
-              win.gBrowser.zenHandleTabMove(folder, () => {
+              win.gZenTabMoves.moveElement(folder, () => {
                 container.insertBefore(
                   folder,
                   container.querySelector(".pinned-tabs-container-separator")
@@ -526,7 +511,7 @@ class nsZenSpacesSyncApplier {
     }
   }
 
-  async #deleteFolders(win, removals, fail) {
+  async async #deleteFolders(win, removals, fail) {
     for (const { key: folderId, record } of removals) {
       try {
         const folder = this.#itemIn(win, folderId);
@@ -545,14 +530,14 @@ class nsZenSpacesSyncApplier {
 
   /* Mark: tabs */
 
-  #applyTabs(win, tabs, fail) {
+  async #applyTabs(win, tabs, fail) {
     for (const { key: tabId, data, record } of tabs) {
       try {
         if (!data.url || data.url === "about:blank") {
           continue;
         }
         const existing = this.#itemIn(win, tabId);
-        if (win.gBrowser.isTab(existing)) {
+        if (existing?.dataset?.zenTabId || existing?.isTab) {
           this.#updateTab(win, existing, data);
         } else {
           this.#createTab(win, tabId, data);
@@ -563,27 +548,23 @@ class nsZenSpacesSyncApplier {
     }
   }
 
-  #createTab(win, tabId, data) {
-    const userContextId = this.#resolveContainerId(data.containerGuid);
+  async #createTab(win, tabId, data) {
+    const userContextId = await this.#resolveContainerId(data.containerGuid);
     syncLog(
       `creating tab ${tabId} ` +
         `(essential=${!!data.essential}, container=${userContextId})`,
       data.url
     );
-    const tab = win.gBrowser.addTrustedTab(data.url, {
-      createLazyBrowser: true,
-      inBackground: true,
-      skipAnimation: true,
-      skipBackgroundNotify: true,
-      lazyTabTitle: data.title || undefined,
-      userContextId,
-      skipRoute: true,
+    const tab = await createTab(win, data.url, {
+      pinned: data.pinned !== false,
+      title: data.title || undefined,
+      workspaceUuid: data.workspaceUuid,
     });
     // Setting the sync id before the queued TabOpen handler runs makes
     // window sync treat this tab as already replicated.
     tab.id = tabId;
     tab._zenContentsVisible = true;
-    this.#updateTabIdentity(win, tab, data);
+    await this.#updateTabIdentity(win, tab, data);
     if (data.essential) {
       win.gZenPinnedTabManager.addToEssentials(tab, { replicating: true });
     } else {
@@ -591,7 +572,7 @@ class nsZenSpacesSyncApplier {
         tab.setAttribute("zen-workspace-id", data.workspaceUuid);
       }
       if (data.pinned !== false) {
-        win.gBrowser.pinTab(tab);
+        await pinTab(tab);
       }
       if (data.workspaceUuid) {
         win.gZenWorkspaces.moveTabToWorkspace(tab, data.workspaceUuid);
@@ -612,7 +593,7 @@ class nsZenSpacesSyncApplier {
    * @param {MozTabbrowserTab} tab
    * @param {object} data
    */
-  #updateTabIdentity(win, tab, data) {
+  async #updateTabIdentity(win, tab, data) {
     const icon = syncableIconUrl(data.icon);
     const initial = tab._zenPinnedInitialState;
     const identityChanged =
@@ -644,7 +625,7 @@ class nsZenSpacesSyncApplier {
       if (staticLabel) {
         tab._zenChangeLabelFlag = true;
         try {
-          win.gBrowser._setTabLabel(tab, staticLabel);
+          tab.label = staticLabel;
         } finally {
           delete tab._zenChangeLabelFlag;
         }
@@ -659,8 +640,8 @@ class nsZenSpacesSyncApplier {
           `setting synced${data.hasStaticIcon ? " static" : ""} ` +
             `icon on tab ${tab.id}`
         );
-        win.gBrowser.setIcon(tab, icon);
-        lazy.TabStateCache.update(tab.linkedBrowser.permanentKey, {
+        tab.faviconUrl = icon;
+        lazy.TabStateCache.update(tab.id, {
           image: null,
         });
       } catch (e) {
@@ -683,10 +664,11 @@ class nsZenSpacesSyncApplier {
    * @param {object} data
    * @param {?string} previousPinUrl - The pin url before this record applied.
    */
-  #retargetUnloadedTab(win, tab, data, previousPinUrl) {
+  async #retargetUnloadedTab(win, tab, data, previousPinUrl) {
     try {
-      // Chromium: getTabState(tab) / chrome.storage.session (see adapters/session.mjs).
-      const state = JSON.parse(getTabState(tab));
+      const state = JSON.parse((await getTabState(tab)) ?? "null") ?? {
+        entries: [],
+      };
       const entries = state.entries || [];
       let currentUrl = null;
       if (entries.length) {
@@ -706,19 +688,15 @@ class nsZenSpacesSyncApplier {
         {
           url: data.url,
           title: data.title || "",
-          triggeringPrincipal_base64: lazy.E10SUtils.serializePrincipal(
-            Services.scriptSecurityManager.createContentPrincipal(
-              Services.io.newURI(data.url),
-              {}
-            )
-          ),
+          triggeringPrincipal_base64: lazy.E10SUtils.serializePrincipal({
+            url: data.url,
+          }),
         },
       ];
       state.index = 1;
       state.image = syncableIconUrl(data.icon) || undefined;
       delete state.scroll;
-      // Chromium: setTabState(tab, state) / chrome.storage.session.
-      setTabState(tab, state);
+      await setTabState(tab, state);
     } catch (e) {
       console.error("ZenSpacesSync: failed to retarget unloaded tab", e);
     }
@@ -745,14 +723,14 @@ class nsZenSpacesSyncApplier {
       // ungroupTab pops a single nesting level. An item inside a subfolder
       // lands inside the parent folder, so keep going until it is actually
       // top-level.
-      while (win.gBrowser.isTabGroup(item.group) && item.group.isZenFolder) {
-        win.gBrowser.ungroupTab(item);
+      while (item.group?.isZenFolder) {
+        item.group.removeTabs?.([item]);
       }
     }
   }
 
-  #updateTab(win, tab, data) {
-    this.#updateTabIdentity(win, tab, data);
+  async #updateTab(win, tab, data) {
+    await this.#updateTabIdentity(win, tab, data);
 
     const isEssential = tab.hasAttribute("zen-essential");
     if (data.essential && !isEssential) {
@@ -778,9 +756,9 @@ class nsZenSpacesSyncApplier {
     const wantPinned = data.pinned !== false;
     if (wantPinned !== tab.pinned) {
       if (wantPinned) {
-        win.gBrowser.pinTab(tab);
+        await pinTab(tab);
       } else {
-        win.gBrowser.unpinTab(tab);
+        await unpinTab(tab);
         // Pin identity would otherwise freeze the projection of what is now
         // a normal tab.
         delete tab._zenPinnedInitialState;
@@ -803,18 +781,18 @@ class nsZenSpacesSyncApplier {
         changeTab: false,
       });
     }
-    win.gBrowser.removeTab(tab, { animate: true });
+    await removeTab(win, tab);
   }
 
-  #deleteTabs(win, removals, fail) {
+  async #deleteTabs(win, removals, fail) {
     for (const { key: tabId, record } of removals) {
       try {
         const tab = this.#itemIn(win, tabId);
-        if (win.gBrowser.isTab(tab)) {
+        if (tab?.dataset?.zenTabId || tab?.isTab) {
           if (tab.hasAttribute("zen-essential")) {
             console.warn(
               `ZenSpacesSync: incoming tombstone removes essential tab ${tabId}`,
-              tab.linkedBrowser?.currentURI?.spec ?? ""
+              tab.faviconUrl ?? ""
             );
           } else {
             syncLog(`incoming tombstone removes tab ${tabId}`);
@@ -829,12 +807,12 @@ class nsZenSpacesSyncApplier {
 
   /* Mark: splits */
 
-  #applySplits(win, splits, fail) {
+  async #applySplits(win, splits, fail) {
     for (const { key: splitId, data, record } of splits) {
       try {
         const members = (data.tabs || [])
           .map(id => this.#itemIn(win, id))
-          .filter(tab => win.gBrowser.isTab(tab));
+          .filter(tab => tab?.dataset?.zenTabId || tab?.isTab);
         const existing = this.#itemIn(win, splitId);
         const hasGroup = existing?.hasAttribute?.("split-view-group");
         if (hasGroup) {
@@ -862,7 +840,7 @@ class nsZenSpacesSyncApplier {
     }
   }
 
-  #deleteSplits(win, removals, fail) {
+  async #deleteSplits(win, removals, fail) {
     for (const { key: splitId, record } of removals) {
       try {
         const index = win.gZenViewSplitter._data.findIndex(
@@ -891,7 +869,7 @@ class nsZenSpacesSyncApplier {
         prev.parentNode === el.parentNode &&
         prev.nextElementSibling !== el
       ) {
-        win.gBrowser.zenHandleTabMove(el, () => prev.after(el));
+        win.gZenTabMoves.moveElement(el, () => prev.after(el));
       }
       prev = el;
     }
@@ -906,7 +884,7 @@ class nsZenSpacesSyncApplier {
    * @param {object} incoming
    * @param {Function} fail
    */
-  #applyOrdering(win, incoming, fail) {
+  async #applyOrdering(win, incoming, fail) {
     for (const { key, data, record } of [
       ...incoming.spaces,
       ...incoming.folders,
