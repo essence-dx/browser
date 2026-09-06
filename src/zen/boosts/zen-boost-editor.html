@@ -1,0 +1,82 @@
+<!doctype html>
+<html id="zenBoostWindow" data-l10n-sync="true">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="./zen-boosts.css" />
+  <link rel="stylesheet" href="./zen-advanced-color-options.css" />
+</head>
+<body>
+  <div id="zen-boost-editor-root">
+    <div id="zen-boost-head-wrapper">
+      <button id="zen-boost-close" class="subviewbutton mod-button title-button"></button>
+      <div id="zen-boost-name">
+        <div id="zen-boost-name-container">
+          <p id="zen-boost-name-text"></p>
+        </div>
+      </div>
+      <button data-l10n-id="zen-boost-shuffle" id="zen-boost-shuffle" class="subviewbutton mod-button title-button"></button>
+    </div>
+    <div id="zen-boost-filter-wrapper">
+      <div class="zen-boost-color-picker-gradient zen-boost-panel-disabled">
+        <button data-l10n-id="zen-boost-magic-theme" id="zen-boost-magic-theme" class="subviewbutton mod-button"></button>
+        <div id="zen-boost-color-picker-dot-primary" class="zen-boost-color-picker-dot no-squircles"></div>
+        <div id="zen-boost-color-picker-dot-secondary" class="zen-boost-color-picker-dot no-squircles"></div>
+        <div class="zen-boost-color-picker-circle no-squircles"></div>
+      </div>
+
+      <div id="zen-boost-toolbar-wrapper-colors">
+        <button data-l10n-id="zen-boost-invert" id="zen-boost-invert" class="subviewbutton mod-button small"></button>
+        <button data-l10n-id="zen-boost-controls" id="zen-boost-controls" class="subviewbutton mod-button small"></button>
+        <button data-l10n-id="zen-boost-disable" id="zen-boost-disable" class="subviewbutton mod-button small"></button>
+      </div>
+
+      <div id="zen-boost-font-wrapper">
+        <div id="zen-boost-font-grid">
+        </div>
+        <div class="visible-separator"></div>
+        <div id="zen-boost-font-toolbar">
+          <select name="font" id="zen-boost-font-select" class="mod-button">
+          </select>
+        </div>
+      </div>
+
+      <div id="zen-boost-toolbar-wrapper">
+        <button id="zen-boost-size" class="subviewbutton mod-button big-button med">
+          <p data-l10n-id="zen-boost-size" id="zen-boost-size-text"></p>
+          <p id="zen-boost-size-value"></p>
+        </button>
+        <button id="zen-boost-case" class="subviewbutton mod-button big-button toggleable-button med">
+          <p data-l10n-id="zen-boost-case" id="zen-boost-case-text"></p>
+        </button>
+      </div>
+
+      <button id="zen-boost-zap" class="subviewbutton mod-button big-button toggleable-button">
+        <p data-l10n-id="zen-boost-zap" id="zen-boost-zap-text"></p>
+        <p id="zen-boost-zap-value"></p>
+      </button>
+
+      <button id="zen-boost-code" class="subviewbutton mod-button big-button">
+        <p data-l10n-id="zen-boost-code" id="zen-boost-code-text"></p>
+      </button>
+
+    </div>
+  </div>
+  <div id="zen-boost-code-editor-root">
+    <div id="zen-boost-code-top-bar">
+      <button id="zen-boost-back" class="subviewbutton mod-button big-button">
+        <p data-l10n-id="zen-boost-back" id="zen-boost-back-text"></p>
+      </button>
+    </div>
+
+    <div id="zen-boost-code-editor">
+    </div>
+
+    <div id="zen-boost-code-bottom-bar">
+      <button data-l10n-id="zen-boost-css-picker" id="zen-boost-css-picker" class="subviewbutton mod-button big-button toggleable-button"></button>
+      <button data-l10n-id="zen-boost-css-inspector" id="zen-boost-css-inspector" class="subviewbutton mod-button big-button"></button>
+    </div>
+  </div>
+
+  <script type="module" src="./zen-boost-editor.js"></script>
+</body>
+</html>

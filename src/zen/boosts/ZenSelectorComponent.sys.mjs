@@ -2,11 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const lazy = {};
-
-ChromeUtils.defineLazyGetter(lazy, "overlayLocalization", () => {
-  return new Localization(["browser/zen-boosts.ftl"], true);
-});
+const lazy = {
+  overlayLocalization: {
+    formatMessagesSync: ids => ids.map(id => ({ value: id })),
+  },
+};
 
 export class SelectorComponent {
   document = null;
@@ -50,7 +50,7 @@ export class SelectorComponent {
     localizationArray = null
   ) {
     this.document = document;
-    this.window = document.documentGlobal;
+    this.window = document.defaultView ?? globalThis;
     this.zenBoostsChild = zenBoostsChild;
     this.#onSelect = onSelect;
 
@@ -70,7 +70,10 @@ export class SelectorComponent {
       return;
     }
 
-    this.#content = this.document.insertAnonymousContent();
+    const host = this.document.createElement("div");
+    host.id = "zen-selector-host";
+    const root = host.attachShadow({ mode: "open" });
+    this.#content = { host, root };
     this.#content.root.appendChild(this.fragment);
     this.#initializeElements();
     this.setState(SelectorComponent.STATES.SELECTING);
@@ -157,8 +160,7 @@ export class SelectorComponent {
   }
 
   get content() {
-    // Chromium: content WindowProxy stays alive; Cu.isDeadWrapper is Gecko-only.
-    if (!this.#content || Cu.isDeadWrapper(this.#content)) {
+    if (!this.#content) {
       return null;
     }
     return this.#content;
@@ -180,7 +182,7 @@ export class SelectorComponent {
 
     return `
     <template>
-      <link rel="stylesheet" href="chrome://browser/content/zen-styles/content/zen-selector.css" />
+      <link rel="stylesheet" href="./zen-selector.css" />
       <div id="select-component">
         <div id="select-controls">
           <input type="button" id="select-this" value="${thisElement.value}"/>
@@ -316,7 +318,7 @@ export class SelectorComponent {
     }
 
     const pathText = `<b>[${selection.length}]</b> ${selectionPath.substring(0, Math.min(maxPathLength, selectionPath.length))}`;
-    this.getElementById("selector-element-preview-text").setHTML(pathText);
+    this.getElementById("selector-element-preview-text").innerHTML = pathText;
   }
 
   /**
@@ -325,9 +327,8 @@ export class SelectorComponent {
   tearDown() {
     if (this.#content) {
       try {
-        this.document.removeAnonymousContent(this.#content);
+        this.#content.host.remove();
       } catch {
-        /* This might fail but that's not an issue */
       }
     }
 
@@ -440,8 +441,8 @@ export class SelectorComponent {
    */
   handleEvent(event, prevent) {
     let isZenContent = false;
-    if (event?.originalTarget?.closest) {
-      const closestID = event.originalTarget.closest("div")?.id ?? "";
+    if (event?.target?.closest) {
+      const closestID = event.target.closest("div")?.id ?? "";
       isZenContent = this.#zenContentIDs.includes(closestID);
     }
 

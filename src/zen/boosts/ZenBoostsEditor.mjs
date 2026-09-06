@@ -2,13 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const { gZenBoostsManager } = ChromeUtils.importESModule(
-  "resource:///modules/zen/boosts/ZenBoostsManager.sys.mjs"
-);
-
-// Chromium migration (lane 3): observer bus + selected tab via adapters.
-// Gecko: Services.obs / openerWindow.gBrowser. Chromium: chrome.events / chrome.tabs
-// (see src/zen/adapters/observers.mjs, adapters/tabs.mjs).
+import { gZenBoostsManager } from "./ZenBoostsManager.sys.mjs";
 import {
   addObserver,
   removeObserver,
@@ -78,11 +72,7 @@ export class nsZenBoostEditor {
    * @returns {ZenBoostsParent} Boost JSActor parent
    */
   get zenBoostsParent() {
-    // Chromium: getSelectedTab() / chrome.tabs.query({active:true}).
-    const linkedBrowser = this.openerWindow.gBrowser.selectedTab.linkedBrowser;
-    const actor =
-      linkedBrowser.browsingContext.currentWindowGlobal.getActor("ZenBoosts");
-    return actor;
+    return this.openerWindow?.zenBoosts ?? null;
   }
 
   /**
@@ -250,29 +240,19 @@ export class nsZenBoostEditor {
       return;
     }
 
-    const { DevToolsLoader } = ChromeUtils.importESModule(
-      "resource://devtools/shared/loader/Loader.sys.mjs"
-    );
-    const loader = new DevToolsLoader({
-      invisibleToDebugger: true,
-    });
-    const { require } = loader;
-    const Editor = require("resource://devtools/client/shared/sourceeditor/editor");
     const container = this.doc.getElementById("zen-boost-code-editor");
+    const textarea = this.doc.createElement("textarea");
+    textarea.className = "zen-boost-code-textarea";
+    textarea.value = this.currentBoostData?.boostData?.customCSS ?? "";
+    textarea.addEventListener("input", this.onCodeEditorChange.bind(this));
+    container.appendChild(textarea);
 
-    const editor = new Editor({
-      mode: Editor.modes.css,
-      lineNumbers: true,
-      theme: "mozilla",
-      readOnly: false,
-      gutters: ["CodeMirror-linenumbers"],
-    });
-
-    await editor.appendTo(container);
-    editor.refresh();
-    editor.on("change", this.onCodeEditorChange.bind(this));
-
-    this.editorWindow._editor = editor;
+    this.editorWindow._editor = {
+      getValue: () => textarea.value,
+      setValue: value => {
+        textarea.value = value;
+      },
+    };
     this.codeEditorReady = true;
 
     this.updateColorScheme();
@@ -399,13 +379,7 @@ export class nsZenBoostEditor {
    * @returns {Array<AString>} An array with names of available fonts.
    */
   fetchFontList() {
-    // Chromium: document.fonts / FontFaceSet has no system enumeration;
-    // shell provides a fallback list until a native font API lands.
-    const enumerator = Cc["@mozilla.org/gfx/fontenumerator;1"].createInstance(
-      Ci.nsIFontEnumerator
-    );
-
-    return enumerator.EnumerateFonts(null, null);
+    return ["sans-serif", "serif", "monospace", "system-ui"];
   }
 
   /**
@@ -1396,23 +1370,14 @@ ${cssSelector} {
       "zen-boost-rename-boost-prompt",
     ]);
 
-    let input = {
-      value: this.currentBoostData.boostName, // Default value and also output
-    };
-    // Chromium: extension dialog / window.prompt; Services.prompt has no equivalent.
-    const success = await Services.prompt.prompt(
-      this.openerWindow,
+    const newName = this.openerWindow.prompt(
       title.value,
-      null,
-      input,
-      null,
-      { value: false }
+      this.currentBoostData.boostName
     );
 
-    if (!success) {
+    if (newName === null) {
       return;
     }
-    const newName = input.value;
     const maxDisplayedNameChars = 10;
 
     if (newName.trim().length !== 0) {

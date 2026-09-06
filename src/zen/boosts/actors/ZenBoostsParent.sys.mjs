@@ -2,19 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-const lazy = {};
+import { gZenBoostsManager } from "../ZenBoostsManager.sys.mjs";
 
-ChromeUtils.defineESModuleGetters(lazy, {
-  gZenBoostsManager: "resource:///modules/zen/boosts/ZenBoostsManager.sys.mjs",
-});
+const lazy = { gZenBoostsManager };
 
-// Chromium migration (lane 3): observer bus via adapter.
-// Gecko: Services.obs. Chromium: chrome.events / EventTarget (see adapters/observers.mjs).
 import {
   addObserver,
   removeObserver,
   notifyObservers,
 } from "../../adapters/observers.mjs";
+import { getSelectedTab } from "../../adapters/tabs.mjs";
+import { getTopWindow } from "../../adapters/windows.mjs";
 
 export class ZenBoostsParent extends JSWindowActorParent {
   static OBSERVERS = [
@@ -107,23 +105,10 @@ export class ZenBoostsParent extends JSWindowActorParent {
   async receiveMessage(message) {
     switch (message.name) {
       case "ZenBoost:OpenInspector": {
-        const { require } = ChromeUtils.importESModule(
-          "resource://devtools/shared/loader/Loader.sys.mjs"
-        );
-
-        const { gDevTools } = require("devtools/client/framework/devtools");
-
-        // Chromium: chrome.windows.getLastFocused + chrome.tabs.query({active:true}).
-        let win = Services.wm.getMostRecentWindow("navigator:browser");
-        let tab = win.gBrowser.selectedTab;
-
-        let toolbox = gDevTools.getToolboxForTab(tab);
-
-        if (toolbox) {
-          await gDevTools.closeToolboxForTab(tab);
-        } else {
-          await gDevTools.showToolboxForTab(tab, "inspector");
-        }
+        getTopWindow().then(win => {
+          const tab = win ? getSelectedTab(win) : null;
+          win?.openDevTools?.(tab, "inspector");
+        });
         break;
       }
       case "ZenBoost:Notify": {

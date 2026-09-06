@@ -16,16 +16,17 @@ FINAL_TARGET_FILES.actors += [
     "actors/ZenBoostsParent.sys.mjs",
 ]
 
-EXPORTS.mozilla += [
-    "nsZenBoostsBackend.h",
-]
+if CONFIG["ZEN_ENGINE"] != "chromium":
+    EXPORTS.mozilla += [
+        "nsZenBoostsBackend.h",
+    ]
 
-SOURCES += [
-    "nsZenBCOverrides.cpp",
-    "nsZenBoostsBackend.cpp",
-]
+    SOURCES += [
+        "nsZenBCOverrides.cpp",
+        "nsZenBoostsBackend.cpp",
+    ]
 
-FINAL_LIBRARY = "xul"
+    FINAL_LIBRARY = "xul"
 
 TEST_DIRS += [
     "gtest",

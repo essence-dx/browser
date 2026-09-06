@@ -47,7 +47,7 @@
   animation: 0.15s zap-border-in ease-out;
 
   border-radius: 4px;
-  @media (-moz-platform: macos) {
+  @media (pointer: fine) {
     border-radius: 8px;
   }
 }
@@ -69,7 +69,7 @@
   position: fixed;
 
   border-radius: 6px;
-  @media (-moz-platform: macos) {
+  @media (pointer: fine) {
     border-radius: 12px;
   }
 
@@ -87,7 +87,7 @@
     height: 36px;
 
     border-radius: 4px;
-    @media (-moz-platform: macos) {
+    @media (pointer: fine) {
       border-radius: 8px;
     }
 

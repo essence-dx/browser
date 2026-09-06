@@ -4,20 +4,25 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
-
-const lazy = XPCOMUtils.declareLazy({
-  styleSheetService: {
-    service: "@mozilla.org/content/style-sheet-service;1",
-    iid: Ci.nsIStyleSheetService,
+const lazy = {
+  get styleSheetService() {
+    return {
+      registerSheet(uri) {
+        document.adoptedStyleSheets = [
+          ...document.adoptedStyleSheets,
+          uri.sheet,
+        ];
+      },
+      unregisterSheet(uri) {
+        document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
+          sheet => sheet !== uri.sheet
+        );
+      },
+    };
   },
-});
+};
 
-const AGENT_SHEET = Ci.nsIStyleSheetService.AGENT_SHEET;
-
-// Chromium migration (lane 3): boost CSS injection.
-// Gecko: nsIStyleSheetService/winUtils.loadSheet. Chromium: chrome.scripting.insertCSS
-// with the same style string (see adapters/xul.mjs for DOM fallback notes).
+const AGENT_SHEET = "agent";
 
 export class nsZenBoostStyles {
   #stylesCache = new Map();
@@ -108,9 +113,9 @@ export class nsZenBoostStyles {
    * @private
    */
   #convertStyleToDataUri(rawStyle) {
-    // Chromium: chrome.scripting.insertCSS({ css }); nsIStyleSheetService is Gecko-only.
-    const encodedStyle = encodeURIComponent(rawStyle);
-    return Services.io.newURI(`data:text/css;charset=utf-8,${encodedStyle}`);
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(rawStyle);
+    return { spec: `data:text/css,${encodeURIComponent(rawStyle)}`, sheet };
   }
 
   /**
@@ -121,9 +126,8 @@ export class nsZenBoostStyles {
    * @private
    */
   #cacheStyle(styleUri, domain) {
-    // Chromium: style id via crypto.randomUUID(); store in chrome.storage.session.
     this.#stylesCache.set(domain, {
-      uuid: Services.uuid.generateUUID().toString(),
+      uuid: crypto.randomUUID(),
       uri: styleUri,
     });
   }

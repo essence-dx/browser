@@ -2,21 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const lazy = {};
+import { ZapDissolve } from "./ZenZapDissolve.sys.mjs";
+import { SelectorComponent } from "./ZenSelectorComponent.sys.mjs";
 
-ChromeUtils.defineESModuleGetters(lazy, {
-  ZapDissolve: "resource:///modules/zen/boosts/ZenZapDissolve.sys.mjs",
-  SelectorComponent:
-    "resource:///modules/zen/boosts/ZenSelectorComponent.sys.mjs",
-});
+const lazy = {
+  ZapDissolve,
+  SelectorComponent,
+  overlayLocalization: {
+    formatMessagesSync: ids => ids.map(id => ({ value: id })),
+  },
+};
 
-ChromeUtils.defineLazyGetter(lazy, "overlayLocalization", () => {
-  return new Localization(["browser/zen-boosts.ftl"], true);
-});
-
-// Chromium migration (lane 3): dissolve pref via adapter.
-// Gecko: Services.prefs. Chromium: chrome.storage (see adapters/prefs.mjs).
-// chrome:// stylesheet link in markup below becomes extension content-script CSS.
 import { getBoolPref } from "../adapters/prefs.mjs";
 
 export class ZapOverlay {
@@ -39,7 +35,7 @@ export class ZapOverlay {
    */
   constructor(document, zenBoostsChild) {
     this.document = document;
-    this.window = document.documentGlobal;
+    this.window = document.defaultView ?? globalThis;
     this.zenBoostsChild = zenBoostsChild;
 
     this.#selectorComponent = new lazy.SelectorComponent(
@@ -71,8 +67,12 @@ export class ZapOverlay {
 
     this.#selectorComponent.initialize();
 
-    this.#content = this.document.insertAnonymousContent();
+    const host = this.document.createElement("div");
+    host.id = "zen-zap-host";
+    const root = host.attachShadow({ mode: "open" });
+    this.#content = { host, root };
     this.#content.root.appendChild(this.fragment);
+    this.document.documentElement.appendChild(host);
     this.#initializeElements();
 
     this.#initialized = true;
@@ -112,8 +112,7 @@ export class ZapOverlay {
   }
 
   get content() {
-    // Chromium: content WindowProxy stays alive; Cu.isDeadWrapper is Gecko-only.
-    if (!this.#content || Cu.isDeadWrapper(this.#content)) {
+    if (!this.#content) {
       return null;
     }
     return this.#content;
@@ -136,7 +135,7 @@ export class ZapOverlay {
 
     return `
     <template>
-      <link rel="stylesheet" href="chrome://browser/content/zen-styles/content/zen-zap.css" />
+      <link rel="stylesheet" href="./zen-zap.css" />
       <div id="zap-controls-container">
         <div id="zap-list">
         </div>
@@ -279,12 +278,12 @@ export class ZapOverlay {
 
     if (!boostData.zapSelectors.length) {
       const addZapHelperText = zapList.ownerDocument.createElement("p");
-      addZapHelperText.setHTML(addZapHelper.value);
+      addZapHelperText.textContent = addZapHelper.value;
       addZapHelperText.classList.add("pcenter");
       zapList.appendChild(addZapHelperText);
     } else {
       const removeZapHelperText = zapList.ownerDocument.createElement("p");
-      removeZapHelperText.setHTML(removeZapHelper.value);
+      removeZapHelperText.textContent = removeZapHelper.value;
       zapList.appendChild(removeZapHelperText);
     }
   }
@@ -295,7 +294,7 @@ export class ZapOverlay {
    * @param {Event} event
    */
   #unzapButtonHover(event) {
-    const button = event.originalTarget;
+    const button = event.target;
     const selector = button.getAttribute("selector");
     this.zenBoostsChild.tempShowZappedElement(selector);
 
@@ -320,7 +319,7 @@ export class ZapOverlay {
    * @param {Event} event
    */
   #unzapButtonUnhover(event) {
-    const button = event.originalTarget;
+    const button = event.target;
     button.value = button.getAttribute("index");
 
     this.zenBoostsChild.tempHideZappedElement();
@@ -333,7 +332,7 @@ export class ZapOverlay {
    * @param {Event} event
    */
   #unzapButtonClick(event) {
-    const button = event.originalTarget;
+    const button = event.target;
     const selector = button.getAttribute("selector");
 
     this.zenBoostsChild.tempHideZappedElement();
@@ -366,9 +365,8 @@ export class ZapOverlay {
 
     if (this.#content) {
       try {
-        this.document.removeAnonymousContent(this.#content);
+        this.#content.host.remove();
       } catch {
-        /* This might fail but that's not an issue */
       }
     }
 
@@ -404,7 +402,7 @@ export class ZapOverlay {
    * @param {Event} event Mouse move event params
    */
   #handleClick(event) {
-    if (event.originalTarget.id == "zen-zap-unzap") {
+    if (event.target.id == "zen-zap-unzap") {
       this.#unzapButtonClick(event);
     }
   }
@@ -415,7 +413,7 @@ export class ZapOverlay {
    * @param {Event} event Mouse enter event params
    */
   #handleHoverDelegation(event) {
-    if (event.originalTarget.id == "zen-zap-unzap") {
+    if (event.target.id == "zen-zap-unzap") {
       this.#unzapButtonHover(event);
     }
   }
@@ -426,7 +424,7 @@ export class ZapOverlay {
    * @param {Event} event Mouse leave event params
    */
   #handleUnhoverDelegation(event) {
-    if (event.originalTarget.id == "zen-zap-unzap") {
+    if (event.target.id == "zen-zap-unzap") {
       this.#unzapButtonUnhover(event);
     }
   }

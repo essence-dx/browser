@@ -2,16 +2,22 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { JSONFile } from "resource://gre/modules/JSONFile.sys.mjs";
-import { nsZenBoostStyles } from "resource:///modules/zen/boosts/ZenBoostStyles.sys.mjs";
+import { nsZenBoostStyles } from "./ZenBoostStyles.sys.mjs";
 
-// Chromium migration (lane 3): observer + prefs via adapters.
-// Gecko: Services.obs / Services.prefs. Chromium: chrome.events / chrome.storage
-// (see src/zen/adapters/observers.mjs, adapters/prefs.mjs).
-// Remaining Gecko (window/ww/filepicker/chrome:// URL) maps to chrome.windows /
-// chrome.fileSystem / extension URLs at the shell layer.
 import { notifyObservers } from "../adapters/observers.mjs";
 import { getBoolPref } from "../adapters/prefs.mjs";
+import {
+  joinPath,
+  getProfileDir,
+  makeDirectory,
+  pathExists,
+  readUTF8,
+  writeUTF8,
+  removePath,
+  readJSON,
+  writeJSON,
+} from "../adapters/storage.mjs";
+import { getTopWindow } from "../adapters/windows.mjs";
 
 class nsZenBoostsManager {
   registeredDomains = new Map(); // <domain, { boosts: <id, boostEntry>, activeBoostID: null }>
@@ -437,8 +443,7 @@ class nsZenBoostsManager {
    * @private
    */
   get #storePath() {
-    const profilePath = PathUtils.profileDir;
-    return PathUtils.join(profilePath, this.#saveFilename);
+    return joinPath(getProfileDir(), this.#saveFilename);
   }
 
   /**
@@ -448,8 +453,7 @@ class nsZenBoostsManager {
    * @private
    */
   get #cssPath() {
-    const profilePath = PathUtils.profileDir;
-    return PathUtils.join(profilePath, "zen-boosts");
+    return joinPath(getProfileDir(), "zen-boosts");
   }
 
   /**
@@ -459,14 +463,7 @@ class nsZenBoostsManager {
    * @private
    */
   async #readFromDisk() {
-    this.#file = new JSONFile({
-      path: this.#storePath,
-      compression: "lz4",
-    });
-
-    await this.#file.load();
-
-    const raw = this.#file.data ?? {};
+    const raw = (await readJSON(this.#storePath)) ?? {};
     const map = new Map();
 
     for (const [domain, entry] of Object.entries(raw)) {
@@ -500,13 +497,12 @@ class nsZenBoostsManager {
   async #readBoostCSS(id) {
     const fileName = `${id}.css`;
     const directoryPath = this.#cssPath;
-    const savePath = PathUtils.join(directoryPath, fileName);
+    const savePath = joinPath(directoryPath, fileName);
 
-    await IOUtils.makeDirectory(directoryPath, { createAncestors: true });
+    await makeDirectory(directoryPath, { createAncestors: true });
 
-    if (await IOUtils.exists(savePath)) {
-      const css = await IOUtils.readUTF8(savePath);
-      return css;
+    if (await pathExists(savePath)) {
+      return readUTF8(savePath);
     }
 
     return null;
@@ -536,8 +532,7 @@ class nsZenBoostsManager {
       };
     }
 
-    this.#file.data = obj;
-    this.#file.saveSoon();
+    writeJSON(this.#storePath, obj);
   }
 
   /**
@@ -549,16 +544,16 @@ class nsZenBoostsManager {
   async #writeBoostCSS(id, css) {
     const fileName = `${id}.css`;
     const directoryPath = this.#cssPath;
-    const savePath = PathUtils.join(directoryPath, fileName);
+    const savePath = joinPath(directoryPath, fileName);
 
     if (!css || css.trim() === "") {
-      if (await IOUtils.exists(savePath)) {
-        await IOUtils.remove(savePath);
+      if (await pathExists(savePath)) {
+        await removePath(savePath);
       }
       return;
     }
-    await IOUtils.makeDirectory(directoryPath, { createAncestors: true });
-    await IOUtils.writeUTF8(savePath, css);
+    await makeDirectory(directoryPath, { createAncestors: true });
+    await writeUTF8(savePath, css);
   }
 
   /**
@@ -648,35 +643,17 @@ class nsZenBoostsManager {
       }
     }
 
-    // Chromium: chrome.windows.create({url: <extension boost-editor page>}).
-    // Keep xhtml URL until the shell extension page lands.
-    const editor = Services.ww.openWindow(
-      parentWindow,
-      "chrome://browser/content/zen-components/windows/zen-boost-editor.xhtml",
-      null,
-      `left=${left},top=${top},chrome,alwaysontop,resizable=no,minimizable=no,dependent,dialog=yes`,
-      null
+    const editor = await getTopWindow().then(win =>
+      win?.open?.(
+        "zen-boost-editor.html",
+        null,
+        `left=${left},top=${top},alwaysontop,resizable=no,minimizable=no,dependent,dialog=yes`
+      )
     );
 
-    // Close the editor if the tab is switched
-    parentWindow.gBrowser.tabContainer.addEventListener(
-      "TabSelect",
-      editor.close.bind(editor),
-      {
-        once: true,
-      }
-    );
-
-    const progressListener = {
-      onLocationChange: webProgress => {
-        if (webProgress.isTopLevel) {
-          editor.close();
-          parentWindow.gBrowser.removeTabsProgressListener(progressListener);
-        }
-      },
-    };
-
-    parentWindow.gBrowser.addProgressListener(progressListener);
+    editor?.addEventListener?.("pagehide", () => editor.close(), {
+      once: true,
+    });
 
     // Give the domain
     editor.domain = domain;
@@ -696,22 +673,7 @@ class nsZenBoostsManager {
    * @param {object} boostData The data of the boost to be exported
    * @returns {Promise<void>} Returns a promise which will be resolved after the export action is complete
    */
-  exportBoost(parentWindow, boostData) {
-    // From: firefox-main/browser/base/content/browser-commands.js:354
-    // https://searchfox.org/firefox-main/source/browser/base/content/browser-commands.js#355:~:text=try%20%7B-,const,fp%2Eopen%28fpCallback%29%3B
-
-    // Chromium: <input type=file> / chrome.fileSystem; nsIFilePicker has no equivalent.
-    const nsIFilePicker = Ci.nsIFilePicker;
-    const fp = Cc["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
-
-    fp.init(
-      parentWindow.browsingContext,
-      `Exporting Boost ${boostData.boostName}...`,
-      nsIFilePicker.modeSave
-    );
-
-    // Sanitizing filename
-    // From: https://gist.github.com/barbietunnie/7bc6d48a424446c44ff4#:~:text=bytes%22%29%3B-,var,%7D
+  async exportBoost(parentWindow, boostData) {
     const illegalRe = /[\/\?<>\\:\*\|":]/g;
 
     // eslint-disable-next-line no-control-regex
@@ -730,26 +692,16 @@ class nsZenBoostsManager {
       sanitized = "New Boost";
     }
 
-    fp.defaultString = sanitized;
-    fp.defaultExtension = "json";
-    fp.appendFilters(nsIFilePicker.filterAll);
-
-    return new Promise(resolve => {
-      fp.open(async result => {
-        if (result === nsIFilePicker.returnOK && fp.file) {
-          try {
-            const boostJSON = JSON.stringify(boostData);
-            await IOUtils.writeUTF8(fp.file.path, boostJSON);
-            resolve(true);
-          } catch (ex) {
-            console.error("Export failed:", ex);
-            resolve(false);
-          }
-        } else {
-          resolve(false);
-        }
-      });
+    const blob = new Blob([JSON.stringify(boostData)], {
+      type: "application/json",
     });
+    const url = URL.createObjectURL(blob);
+    const anchor = parentWindow.document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${sanitized}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    return true;
   }
 
   /**
@@ -759,32 +711,24 @@ class nsZenBoostsManager {
    * @returns {Promise<object | null>} Returns a promise with the boost data or null
    */
   importBoost(parentWindow) {
-    // Chromium: <input type=file> / chrome.fileSystem; nsIFilePicker has no equivalent.
-    const nsIFilePicker = Ci.nsIFilePicker;
-    const fp = Cc["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
-
-    fp.init(
-      parentWindow.browsingContext,
-      "Importing Boost from JSON",
-      nsIFilePicker.modeOpen
-    );
-
-    fp.appendFilters(nsIFilePicker.filterAll);
-
     return new Promise(resolve => {
-      fp.open(async result => {
-        if (result === nsIFilePicker.returnOK && fp.file) {
-          try {
-            const fileContent = await IOUtils.readUTF8(fp.file.path);
-            resolve(JSON.parse(fileContent));
-          } catch (e) {
-            console.error("Import failed:", e);
-            resolve(null);
-          }
-        } else {
+      const input = parentWindow.document.createElement("input");
+      input.type = "file";
+      input.accept = "application/json";
+      input.addEventListener("change", async () => {
+        const file = input.files?.[0];
+        if (!file) {
+          resolve(null);
+          return;
+        }
+        try {
+          resolve(JSON.parse(await file.text()));
+        } catch (e) {
+          console.error("Import failed:", e);
           resolve(null);
         }
       });
+      input.click();
     });
   }
 

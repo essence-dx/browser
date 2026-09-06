@@ -2,15 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-const AGENT_SHEET = Ci.nsIStyleSheetService.AGENT_SHEET;
+import { ZapOverlay } from "../ZenZapOverlayChild.sys.mjs";
+import { SelectorComponent } from "../ZenSelectorComponent.sys.mjs";
 
-const lazy = {};
-
-ChromeUtils.defineESModuleGetters(lazy, {
-  ZapOverlay: "resource:///modules/zen/boosts/ZenZapOverlayChild.sys.mjs",
-  SelectorComponent:
-    "resource:///modules/zen/boosts/ZenSelectorComponent.sys.mjs",
-});
+const lazy = {
+  ZapOverlay,
+  SelectorComponent,
+};
 
 export class ZenBoostsChild extends JSWindowActorChild {
   #currentSheet = null;
@@ -416,18 +414,14 @@ export class ZenBoostsChild extends JSWindowActorChild {
    * @param {object} styleSheet The stylesheet
    */
   #loadStyleSheet(styleSheet) {
-    const browsingContext = this.browsingContext;
-    // Chromium: chrome.scripting.insertCSS; nsIStyleSheetService/winUtils.loadSheet are Gecko-only.
-    styleSheet.uri = Services.io.newURI(styleSheet.uri);
-
     if (this.#currentSheet?.uuid !== styleSheet.uuid) {
       if (this.#currentSheet) {
         this.#unloadCurrentStyleSheet();
       }
-      browsingContext.window.windowGlobalChild.browsingContext.window.windowUtils.loadSheet(
-        styleSheet.uri,
-        AGENT_SHEET
-      );
+      this.document.adoptedStyleSheets = [
+        ...this.document.adoptedStyleSheets,
+        styleSheet.uri.sheet,
+      ];
       this.#currentSheet = styleSheet;
     }
   }
@@ -436,12 +430,11 @@ export class ZenBoostsChild extends JSWindowActorChild {
    * Unloads the currently loaded stylesheet
    */
   #unloadCurrentStyleSheet() {
-    const browsingContext = this.browsingContext;
-    if (this.#currentSheet && browsingContext) {
-      browsingContext.window.windowGlobalChild.browsingContext.window.windowUtils.removeSheet(
-        this.#currentSheet.uri,
-        AGENT_SHEET
-      );
+    if (this.#currentSheet) {
+      this.document.adoptedStyleSheets =
+        this.document.adoptedStyleSheets.filter(
+          sheet => sheet !== this.#currentSheet.uri.sheet
+        );
       this.#currentSheet = null;
     }
   }

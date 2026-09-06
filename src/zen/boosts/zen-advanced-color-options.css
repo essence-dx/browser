@@ -29,7 +29,7 @@
   }
 }
 
-#zen-boost-advanced-color-options-panel input::-moz-range-thumb {
+#zen-boost-advanced-color-options-panel input::-webkit-slider-thumb {
   width: 18px;
   height: 18px;
   background-color: #e6e5ea;
@@ -37,6 +37,6 @@
   border-radius: 100%;
 }
 
-#zen-boost-advanced-color-options-panel input::-moz-range-thumb:active {
+#zen-boost-advanced-color-options-panel input::-webkit-slider-thumb:active {
   background-color: #cbcad0;
 }

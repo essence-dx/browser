@@ -164,7 +164,7 @@ void main() {
       return;
     }
     this.document = document;
-    this.window = document.documentGlobal;
+    this.window = document.defaultView ?? globalThis;
   }
 
   /**
@@ -175,7 +175,10 @@ void main() {
       return;
     }
 
-    this.#content = this.document.insertAnonymousContent();
+    const host = this.document.createElement("div");
+    host.id = "zen-zap-dissolve-host";
+    const root = host.attachShadow({ mode: "open" });
+    this.#content = { host, root };
     this.#content.root.appendChild(this.fragment);
     await this.#initializeElements();
 
@@ -349,12 +352,7 @@ void main() {
       this.#webglContext.NEAREST
     );
 
-    if (
-      image &&
-      image instanceof Ci.nsIImageLoadingContent &&
-      image.width &&
-      image.height
-    ) {
+    if (image && image.width && image.height) {
       this.#webglContext.texImage2D(
         this.#webglContext.TEXTURE_2D,
         0,
@@ -507,15 +505,6 @@ void main() {
     const canvas = this.getElementById("zen-zap-dissolve-canvas");
     this.#resizeCanvasToClientSize(canvas);
 
-    ctx.drawWindow(
-      this.window,
-      rect.left + this.window.scrollX,
-      rect.top + this.window.scrollY,
-      rect.width,
-      rect.height,
-      "rgba(0,0,0,0)"
-    );
-
     this.#loadTexture(captureCanvas);
     this.#bindParameters(element);
 
@@ -524,7 +513,7 @@ void main() {
   }
 
   get content() {
-    if (!this.#content || Cu.isDeadWrapper(this.#content)) {
+    if (!this.#content) {
       return null;
     }
     return this.#content;
@@ -542,7 +531,7 @@ void main() {
   get markup() {
     return `
     <template>
-      <link rel="stylesheet" href="chrome://browser/content/zen-styles/content/zen-zap.css" />
+      <link rel="stylesheet" href="./zen-zap.css" />
       <canvas id="zen-zap-dissolve-canvas"></canvas>
     </template>
     `;
@@ -624,9 +613,8 @@ void main() {
 
     if (this.#content) {
       try {
-        this.document.removeAnonymousContent(this.#content);
+        this.#content.host.remove();
       } catch {
-        /* This might fail but that's not an issue */
       }
     }
 
