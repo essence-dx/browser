@@ -56,7 +56,9 @@
   "updateHostname": "updates.zen-browser.app",
   "migration": {
     "engine": "gecko",
+    "engineOptions": ["gecko", "chromium", "dual"],
     "chromiumBranch": "chromium-migration",
+    "engineChromiumDir": "engine-chromium",
     "strategy": "strangler-fig: isolate pure logic → adapter layer → engine-chromium/ via CEF → shared services → cut over"
   }
 }

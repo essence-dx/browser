@@ -42,6 +42,17 @@ export default [
 
   "gZenSpaceRoutingManager",
 
+  "zenAdapters",
+  "zenPrefsAdapter",
+  "zenTabsAdapter",
+  "zenSessionAdapter",
+  "zenXulAdapter",
+  "zenObserversAdapter",
+  "zenWindowsAdapter",
+  "zenStorageAdapter",
+  "zenColorUtils",
+  "zenSplitLayout",
+
   "Ci",
   "Cu",
   "Cc",

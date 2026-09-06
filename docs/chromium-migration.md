@@ -45,6 +45,14 @@ That is correct. We ship behind a build flag, dual-build in CI, and cut over tab
 - No forking a new repo — history stays here.
 - No shipping dual-binary until adapters land.
 
+## Lane 1 status (main task, hours)
+
+- `src/zen/shared/zenColorUtils.mjs` + `zenSplitLayout.mjs` pure (done, 0 Gecko deps).
+- `src/zen/adapters/{prefs,tabs,session,xul,observers,windows,storage}.mjs` — Gecko body now + commented `chrome.*` stub (done). Lanes 2–3 import from here.
+- `surfer.json:migration` now documents `engineOptions: ["gecko","chromium","dual"]` + `engineChromiumDir: "engine-chromium"`; flag stays `gecko`.
+- `src/zen/zen.globals.mjs` exposes `zenAdapters/*`, `zenColorUtils`, `zenSplitLayout` globals for ESLint.
+- No tests, no merges, no heavy commands — direct `chromium-migration` commits only.
+
 ## Next step
 
-Pick Phase 1 slice (e.g., `ZenGradientGenerator` extraction) and land it behind `engine=gecko` flag.
+Lanes 2–3 swap owned files to `shared/`+`adapters/` imports. `engine-chromium/` (CEF) fetch deferred to final mile.
