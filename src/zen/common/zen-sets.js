@@ -2,6 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+// Gecko command set; Chromium: commands API + chrome.tabs/tabGroups.
+// gBrowser tab calls below map to Lane 2's tabs adapter (see
+// src/zen/adapters/tabs.mjs); live-folders import is Lane 3's.
+
 document.addEventListener(
   "MozBeforeInitialXULLayout",
   () => {

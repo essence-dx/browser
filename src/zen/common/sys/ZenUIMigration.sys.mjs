@@ -3,6 +3,17 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+import {
+  getBoolPref,
+  getIntPref,
+  getStringPref,
+  setBoolPref,
+  setIntPref,
+  setStringPref,
+} from "../../adapters/prefs.mjs";
+import { getAllWindowsRestoredPromise } from "../../adapters/session.mjs";
+// Gecko now (dirsvc/startup/prompt internals below stay Gecko); Chromium:
+// chrome.storage.local + chrome.tabs — same prefs/session adapter surface.
 
 const lazy = {};
 
@@ -31,11 +42,11 @@ class nsZenUIMigration {
   }
 
   get _migrationVersion() {
-    return Services.prefs.getIntPref(this.PREF_NAME, 0);
+    return getIntPref(this.PREF_NAME, 0);
   }
 
   set _migrationVersion(value) {
-    Services.prefs.setIntPref(this.PREF_NAME, value);
+    setIntPref(this.PREF_NAME, value);
   }
 
   _migrate() {
@@ -61,20 +72,20 @@ class nsZenUIMigration {
     const userContentFile = profileDir.clone();
     userContentFile.append("chrome");
     userContentFile.append("userContent.css");
-    Services.prefs.setBoolPref(
+    setBoolPref(
       "zen.workspaces.separate-essentials",
-      Services.prefs.getBoolPref(
+      getBoolPref(
         "zen.workspaces.container-specific-essentials-enabled",
         false
       )
     );
-    const theme = Services.prefs.getIntPref(
+    const theme = getIntPref(
       "layout.css.prefers-color-scheme.content-override",
       0
     );
-    Services.prefs.setIntPref("zen.view.window.scheme", theme);
+    setIntPref("zen.view.window.scheme", theme);
     if (userChromeFile.exists() || userContentFile.exists()) {
-      Services.prefs.setBoolPref(
+      setBoolPref(
         "toolkit.legacyUserProfileCustomizations.stylesheets",
         true
       );
@@ -87,34 +98,35 @@ class nsZenUIMigration {
 
   _migrateV2() {
     if (AppConstants.platform !== "linux") {
-      Services.prefs.setIntPref("zen.theme.gradient-legacy-version", 0);
+      setIntPref("zen.theme.gradient-legacy-version", 0);
     }
   }
 
   _migrateV3() {
     if (
-      Services.prefs
-        .getStringPref("zen.theme.accent-color", "")
+      getStringPref("zen.theme.accent-color", "")
         .startsWith("system")
     ) {
-      Services.prefs.setStringPref("zen.theme.accent-color", "AccentColor");
+      setStringPref("zen.theme.accent-color", "AccentColor");
     }
   }
 
   _migrateV4() {
     // Fix spelling mistake in preference name
-    Services.prefs.setBoolPref(
+    setBoolPref(
       "zen.theme.use-system-colors",
-      Services.prefs.getBoolPref("zen.theme.use-sysyem-colors", false)
+      getBoolPref("zen.theme.use-sysyem-colors", false)
     );
   }
 
   _migrateV5() {
-    Services.prefs.setBoolPref("zen.site-data-panel.show-callout", true);
+    setBoolPref("zen.site-data-panel.show-callout", true);
   }
 
   _migrateV6() {
-    lazy.SessionStore.promiseAllWindowsRestored.then(() => {
+    // Gecko session gate; Chromium: chrome.sessions — see adapters/session.mjs.
+    getAllWindowsRestoredPromise().then(() => {
+      // Gecko window/prompt flow below stays as-is for now.
       const win = Services.wm.getMostRecentWindow("navigator:browser");
       win.setTimeout(async () => {
         const [title, message, learnMore, accept] =
@@ -157,11 +169,11 @@ class nsZenUIMigration {
       Services.prefs.prefHasUserValue(
         "widget.macos.sidebar-blend-mode.behind-window"
       ) &&
-      !Services.prefs.getBoolPref(
+      !getBoolPref(
         "widget.macos.sidebar-blend-mode.behind-window"
       )
     ) {
-      Services.prefs.setBoolPref("zen.widget.macos.window-vibrancy", false);
+      setBoolPref("zen.widget.macos.window-vibrancy", false);
     }
   }
 }

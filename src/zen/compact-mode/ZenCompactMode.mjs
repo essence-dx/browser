@@ -4,6 +4,12 @@
 
 /* eslint-disable consistent-return */
 
+import { getBoolPref, getIntPref, setBoolPref } from "../adapters/prefs.mjs";
+import { parseXULFragment } from "../adapters/xul.mjs";
+// Gecko now; Chromium: chrome.storage + HTML popovers — wire when
+// surfer.json migration.engine === "chromium". gBrowser.tabpanels below
+// maps to the Chromium tab strip container.
+
 const lazy = {};
 
 XPCOMUtils.defineLazyPreferenceGetter(
@@ -67,17 +73,17 @@ window.gZenCompactModeManager = {
   _removeHoverFrames: {},
 
   // Delay to avoid flickering when hovering over the sidebar
-  HOVER_HACK_DELAY: Services.prefs.getIntPref(
+  HOVER_HACK_DELAY: getIntPref(
     "zen.view.compact.hover-hack-delay",
     0
   ),
 
   preInit() {
-    this._wasInCompactMode = Services.prefs.getBoolPref(
+    this._wasInCompactMode = getBoolPref(
       "zen.view.compact.enable-at-startup",
       false
     );
-    this._canDebugLog = Services.prefs.getBoolPref(
+    this._canDebugLog = getBoolPref(
       "zen.view.compact.debug",
       false
     );
@@ -89,6 +95,7 @@ window.gZenCompactModeManager = {
     this.addMouseActions();
 
     const tabIsRightObserver = this._updateSidebarIsOnRight.bind(this);
+    // Gecko pref/obs observers; Chromium: chrome.storage.onChanged listeners.
     Services.prefs.addObserver(
       "zen.tabs.vertical.right-side",
       tabIsRightObserver
@@ -133,7 +140,7 @@ window.gZenCompactModeManager = {
     // window loses focus
     window.addEventListener("deactivate", () => this._collapseTrackedElement());
 
-    this._canShowBackgroundTabToast = Services.prefs.getBoolPref(
+    this._canShowBackgroundTabToast = getBoolPref(
       "zen.view.compact.show-background-tab-toast",
       true
     );
@@ -195,7 +202,7 @@ window.gZenCompactModeManager = {
     lazy.mainAppWrapper.setAttribute("zen-compact-mode", value);
     document.documentElement.setAttribute("zen-compact-mode", value);
     if (typeof this._wasInCompactMode === "undefined") {
-      Services.prefs.setBoolPref("zen.view.compact.enable-at-startup", value);
+      setBoolPref("zen.view.compact.enable-at-startup", value);
     }
     this._updateEvent();
   },
@@ -204,7 +211,7 @@ window.gZenCompactModeManager = {
     if (typeof this._sidebarIsOnRight !== "undefined") {
       return this._sidebarIsOnRight;
     }
-    this._sidebarIsOnRight = Services.prefs.getBoolPref(
+    this._sidebarIsOnRight = getBoolPref(
       "zen.tabs.vertical.right-side"
     );
     return this._sidebarIsOnRight;
@@ -266,7 +273,7 @@ window.gZenCompactModeManager = {
   },
 
   addContextMenu() {
-    const fragment = window.MozXULElement.parseXULToFragment(`
+    const fragment = parseXULFragment(`
       <menu id="zen-context-menu-compact-mode" data-l10n-id="zen-toolbar-context-compact-mode">
         <menupopup>
           <menuitem id="zen-context-menu-compact-mode-toggle" data-l10n-id="zen-toolbar-context-compact-mode-enable" type="checkbox" command="cmd_zenCompactModeToggle"/>
@@ -322,20 +329,20 @@ window.gZenCompactModeManager = {
   },
 
   hideSidebar() {
-    Services.prefs.setBoolPref("zen.view.compact.hide-tabbar", true);
-    Services.prefs.setBoolPref("zen.view.compact.hide-toolbar", false);
+    setBoolPref("zen.view.compact.hide-tabbar", true);
+    setBoolPref("zen.view.compact.hide-toolbar", false);
     this.callAllEventListeners();
   },
 
   hideToolbar() {
-    Services.prefs.setBoolPref("zen.view.compact.hide-toolbar", true);
-    Services.prefs.setBoolPref("zen.view.compact.hide-tabbar", false);
+    setBoolPref("zen.view.compact.hide-toolbar", true);
+    setBoolPref("zen.view.compact.hide-tabbar", false);
     this.callAllEventListeners();
   },
 
   hideBoth() {
-    Services.prefs.setBoolPref("zen.view.compact.hide-tabbar", true);
-    Services.prefs.setBoolPref("zen.view.compact.hide-toolbar", true);
+    setBoolPref("zen.view.compact.hide-tabbar", true);
+    setBoolPref("zen.view.compact.hide-toolbar", true);
     this.callAllEventListeners();
   },
 
@@ -365,8 +372,8 @@ window.gZenCompactModeManager = {
       (!isLeftSideButtons && isRightSidebar);
     if (closelyIllegalState && canHideToolbar && !canHideSidebar) {
       // This state is illegal
-      Services.prefs.setBoolPref("zen.view.compact.hide-tabbar", true);
-      Services.prefs.setBoolPref("zen.view.compact.hide-toolbar", false);
+      setBoolPref("zen.view.compact.hide-tabbar", true);
+      setBoolPref("zen.view.compact.hide-toolbar", false);
       this.callAllEventListeners();
       return true;
     }
@@ -460,14 +467,14 @@ window.gZenCompactModeManager = {
 
   get canHideSidebar() {
     return (
-      Services.prefs.getBoolPref("zen.view.compact.hide-tabbar") ||
+      getBoolPref("zen.view.compact.hide-tabbar") ||
       gZenVerticalTabsManager._hasSetSingleToolbar
     );
   },
 
   get canHideToolbar() {
     return (
-      Services.prefs.getBoolPref("zen.view.compact.hide-toolbar") &&
+      getBoolPref("zen.view.compact.hide-toolbar") &&
       !gZenVerticalTabsManager._hasSetSingleToolbar
     );
   },
@@ -666,7 +673,7 @@ window.gZenCompactModeManager = {
   },
 
   _updateSidebarIsOnRight() {
-    this._sidebarIsOnRight = Services.prefs.getBoolPref(
+    this._sidebarIsOnRight = getBoolPref(
       "zen.tabs.vertical.right-side"
     );
   },
@@ -679,7 +686,7 @@ window.gZenCompactModeManager = {
     if (this._hideAfterHoverDuration) {
       return this._hideAfterHoverDuration;
     }
-    return Services.prefs.getIntPref(
+    return getIntPref(
       "zen.view.compact.toolbar-hide-after-hover.duration"
     );
   },
@@ -689,7 +696,7 @@ window.gZenCompactModeManager = {
       {
         element: this.sidebar,
         screenEdge: this.sidebarIsOnRight ? "right" : "left",
-        keepHoverDuration: Services.prefs.getIntPref(
+        keepHoverDuration: getIntPref(
           "zen.view.compact.sidebar-keep-hover.duration"
         ),
       },
@@ -756,9 +763,10 @@ window.gZenCompactModeManager = {
           (element.hasAttribute("should-hide") ||
             document.documentElement.hasAttribute("zen-has-bookmarks"))) ||
           (this.preference &&
-            Services.prefs.getBoolPref("zen.view.compact.hide-toolbar") &&
+            getBoolPref("zen.view.compact.hide-toolbar") &&
             !gZenVerticalTabsManager._hasSetSingleToolbar))
       ) {
+        // Gecko tabpanels container; Chromium: tab strip container element.
         gBrowser.tabpanels.setAttribute("has-toolbar-hovered", "true");
       }
     } else {

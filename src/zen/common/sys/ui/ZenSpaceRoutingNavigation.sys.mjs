@@ -2,7 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { ZenUIComponent } from "resource:///modules/zen/ui/ZenUIComponent.sys.mjs";
+import { ZenUIComponent } from "./ZenUIComponent.sys.mjs";
+import { setSelectedTab } from "../../../adapters/tabs.mjs";
+// Gecko now (tabbrowser addTab/routing below); Chromium: chrome.tabs.create +
+// tab-group routing — wire when migration.engine === "chromium".
 
 /**
  * Per-window listener that re-routes in-place navigations for Space Routing.
@@ -98,7 +101,7 @@ export class ZenSpaceRoutingNavigation extends ZenUIComponent {
         if (!tab.isConnected) {
           return;
         }
-        gBrowser.selectedTab = tab.owner;
+        setSelectedTab(tab.owner);
         win.gZenWorkspaces.moveTabToWorkspace(tab, targetWorkspaceId);
         if (wasSelected) {
           const targetWorkspace =
@@ -136,6 +139,7 @@ export class ZenSpaceRoutingNavigation extends ZenUIComponent {
       Services.scriptSecurityManager.createNullPrincipal({});
 
     // Defer so we don't mutate the tab strip from inside a progress notification.
+    // Gecko addTab; Chromium: chrome.tabs.create (routed to target space).
     win.setTimeout(() => {
       gBrowser.addTab(urlToOpen, {
         triggeringPrincipal: principal,

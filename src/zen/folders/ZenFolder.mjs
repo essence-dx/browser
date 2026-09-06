@@ -2,6 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+// Gecko now (MozTabbrowserTabGroup base + tab-group/tab APIs below);
+// Chromium: HTMLElement base + chrome.tabs/tabGroups — wire when
+// surfer.json migration.engine === "chromium". Live-folders manager import
+// is Lane 3's (see src/zen/live-folders).
+
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   ZenLiveFoldersManager:

@@ -6,8 +6,13 @@
 
 /* INCLUDE THIS FILE AS:
  *   <script src="chrome://browser/content/zenThemeModifier.js"></script>
+ *   (Gecko path; Chromium: extension page script via chrome.runtime.getURL)
  *
  * FOR ANY WEBSITE THAT WOULD NEED TO USE THE ACCENT COLOR, ETC
+ *
+ * Migration note: classic script, so it cannot import adapters/prefs.mjs yet.
+ * Services.prefs reads below map to getIntPref/getBoolPref/getStringPref
+ * (see src/zen/adapters/prefs.mjs); convert to a module on Chromium.
  */
 {
   const { AppConstants } = ChromeUtils.importESModule(
@@ -98,7 +103,7 @@
     },
 
     updateBorderRadius() {
-      const borderRadius = Services.prefs.getIntPref(
+      const borderRadius = Services.prefs.getIntPref( // -> getIntPref (adapters/prefs.mjs); Chromium: chrome.storage.local
         "zen.theme.border-radius",
         -1
       );
@@ -154,7 +159,7 @@
         !document
           .getElementById("tabbrowser-tabbox")
           ?.hasAttribute("zen-split-view") &&
-        Services.prefs.getBoolPref("zen.view.borderless-fullscreen", true)
+        Services.prefs.getBoolPref("zen.view.borderless-fullscreen", true) // -> getBoolPref (adapters/prefs.mjs); Chromium: chrome.storage.local
       ) {
         separation = 0;
       }
@@ -184,7 +189,7 @@
 
     get elementSeparation() {
       return Math.min(
-        Services.prefs.getIntPref("zen.theme.content-element-separation"),
+        Services.prefs.getIntPref("zen.theme.content-element-separation"), // -> getIntPref (adapters/prefs.mjs)
         kZenMaxElementSeparation
       );
     },
@@ -193,7 +198,7 @@
      * Update the accent color.
      */
     updateAccentColor() {
-      const accentColor = Services.prefs.getStringPref(
+      const accentColor = Services.prefs.getStringPref( // -> getStringPref (adapters/prefs.mjs)
         "zen.theme.accent-color"
       );
       document.documentElement.style.setProperty(

@@ -2,7 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-class nsZenWorkspaceIcons extends MozXULElement {
+import { createXULElementLocal } from "../adapters/xul.mjs";
+// Gecko now (MozXULElement base + XUL toolbarbutton/label); Chromium:
+// HTMLElement + HTML button/label — see adapters/xul.mjs.
+
+class nsZenWorkspaceIcons extends (window.MozXULElement ?? HTMLElement) {
   #hasConnected = false;
 
   connectedCallback() {
@@ -76,6 +80,7 @@ class nsZenWorkspaceIcons extends MozXULElement {
               }
               if (nextSibling !== draggedTab.nextSibling) {
                 /* eslint-disable mozilla/valid-services */
+                // Gecko haptic API; Chromium: navigator.vibrate.
                 Services.zen.playHapticFeedback();
               }
             }
@@ -104,12 +109,12 @@ class nsZenWorkspaceIcons extends MozXULElement {
   }
 
   #createWorkspaceIcon(workspace) {
-    const button = document.createXULElement("toolbarbutton");
+    const button = createXULElementLocal("toolbarbutton");
     button.setAttribute("class", "subviewbutton toolbarbutton-1");
     button.setAttribute("tooltiptext", workspace.name);
     button.setAttribute("zen-workspace-id", workspace.uuid);
     button.setAttribute("context", "zenWorkspaceMoreActions");
-    const icon = document.createXULElement("label");
+    const icon = createXULElementLocal("label");
     icon.setAttribute("class", "zen-workspace-icon");
     const isSvgIcon = workspace.icon && workspace.icon.endsWith(".svg");
     if (gZenWorkspaces.workspaceHasIcon(workspace)) {

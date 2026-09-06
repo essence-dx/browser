@@ -4,7 +4,20 @@
 
 /* eslint-disable consistent-return */
 
-import { nsZenDOMOperatedFeature } from "chrome://browser/content/zen-components/ZenCommonUtils.mjs";
+import { nsZenDOMOperatedFeature } from "../common/modules/ZenCommonUtils.mjs";
+import { getBoolPref } from "../adapters/prefs.mjs";
+import { createXULElementLocal, parseXULFragment } from "../adapters/xul.mjs";
+import {
+  duplicateTab,
+  getSelectedTab,
+  setSelectedTab,
+  getTabForBrowser,
+  getTabs,
+  pinTab,
+  unpinTab,
+} from "../adapters/tabs.mjs";
+// Gecko tabstrip internals below (groups, multiselect, drag-drop);
+// Chromium: chrome.tabs/tabGroups — wire when migration.engine === "chromium".
 
 class nsSplitLeafNode {
   /**
@@ -127,7 +140,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
     );
 
     // Add drag over listener to the browser view
-    if (Services.prefs.getBoolPref("zen.splitView.enable-tab-drop")) {
+    if (getBoolPref("zen.splitView.enable-tab-drop")) {
       const tabBox = document.getElementById("tabbrowser-tabbox");
       tabBox.addEventListener(
         "dragover",
@@ -139,7 +152,8 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
 
   insertIntoContextMenu() {
     const sibling = document.getElementById("context-sep-open");
-    const menuitem = document.createXULElement("menuitem");
+    const menuitem = createXULElementLocal("menuitem");
+    // Chromium: document.createElement("menuitem").
     menuitem.setAttribute("id", "context-zenSplitLink");
     menuitem.setAttribute("hidden", "true");
     menuitem.setAttribute("command", "cmd_zenSplitViewLinkInNewTab");
@@ -188,7 +202,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
    */
   onTabSelect(event) {
     const previousTab = event.detail.previousTab;
-    if (previousTab === gBrowser.selectedTab && this._canDrop) {
+    if (previousTab === getSelectedTab() && this._canDrop) {
       return;
     }
     if (previousTab && !previousTab.hasAttribute("zen-empty-tab")) {
@@ -239,7 +253,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
       if (changeTab) {
         const tabToSelect = remainingTabs.find(remaining => remaining !== tab);
         if (tabToSelect) {
-          gBrowser.selectedTab = tabToSelect;
+          setSelectedTab(tabToSelect);
         }
         document
           .getElementById("cmd_zenNewEmptySplit")
@@ -258,14 +272,14 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
       const toUpdate = this.removeNode(node);
       this.applyGridLayout(toUpdate);
       // Select next tab if the removed tab was selected
-      if (gBrowser.selectedTab === tab) {
-        gBrowser.selectedTab = group.tabs[0];
+      if (getSelectedTab() === tab) {
+        setSelectedTab(group.tabs[0]);
       }
     }
   }
 
   #getDragImageForSplit(tab) {
-    const element = window.MozXULElement.parseXULToFragment(
+    const element = parseXULFragment(
       `
       <vbox id="zen-split-view-drag-image">
         <image />
@@ -335,7 +349,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
       // not our drop then
       if (
         !gBrowser.isTab(draggedTab) ||
-        gBrowser.selectedTab.hasAttribute("zen-empty-tab") ||
+        getSelectedTab().hasAttribute("zen-empty-tab") ||
         draggedTab.documentGlobal !== window
       ) {
         return;
@@ -354,7 +368,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
         !draggedTab.hasAttribute("zen-essential")) ||
       this._lastOpenedTab.hasAttribute("zen-live-folder-item-id")
     ) {
-      this._lastOpenedTab = gBrowser.selectedTab;
+      this._lastOpenedTab = getSelectedTab();
     }
     if (!draggedTab || this._canDrop || this._hasAnimated || this.fakeBrowser) {
       return;
@@ -413,7 +427,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
     // eslint-disable-next-line mozilla/valid-services
     Services.zen.playHapticFeedback();
     this._draggingTab = draggedTab;
-    gBrowser.selectedTab = oldTab;
+    setSelectedTab(oldTab);
     this._hasAnimated = true;
     this.tabBrowserPanel.setAttribute("dragging-split", "true");
     this._animateDropEdge(dropSide, currentView, draggedTab, oldTab);
@@ -448,7 +462,8 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
           break;
       }
     }
-    this.fakeBrowser = document.createXULElement("vbox");
+    this.fakeBrowser = createXULElementLocal("vbox");
+    // Chromium: document.createElement("vbox").
     window.addEventListener("dragend", this.onBrowserDragEndToSplit, {
       once: true,
     });
@@ -565,7 +580,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
       return;
     }
     const side = this.fakeBrowser.getAttribute("side");
-    this._lastOpenedTab = gBrowser.selectedTab;
+    this._lastOpenedTab = getSelectedTab();
     this._draggingTab = null;
     event.dataTransfer.updateDragImage(
       ...gBrowser.tabContainer.tabDragAndDrop.originalDragImageArgs
@@ -879,7 +894,8 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
         // the pointer while a dnd session is on.
         if (!this._dndPanel) {
           this._dndCanvas = canvas;
-          this._dndPanel = document.createXULElement("panel");
+          this._dndPanel = createXULElementLocal("panel");
+          // Chromium: HTML popover element.
           this._dndPanel.className = "dragfeedback-tab";
           this._dndPanel.setAttribute("type", "drag");
           let wrapper = document.createElementNS(
@@ -1199,7 +1215,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
    * Inserts the split view tab context menu item.
    */
   insertSplitViewTabContextMenu() {
-    const element = window.MozXULElement.parseXULToFragment(`
+    const element = parseXULFragment(`
       <menuitem id="context_zenSplitTabs"
                 data-lazy-l10n-id="tab-zen-split-tabs"
                 data-l10n-args='{"tabCount": 1}'
@@ -1239,7 +1255,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
       window.gContextMenu.contentData.docLocation ||
       window.gContextMenu.target.ownerDocument.location.href;
     const currentTab = gZenGlanceManager.getTabOrGlanceParent(
-      window.gBrowser.selectedTab
+      getSelectedTab()
     );
     const newTab = this.openAndSwitchToTab(url, {
       skipRoute: true,
@@ -1260,7 +1276,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
   contextSplitTabs(otherTabHint = null) {
     let tabs;
     let currentTab = gZenGlanceManager.getTabOrGlanceParent(
-      TabContextMenu.contextTab || gBrowser.selectedTab
+      TabContextMenu.contextTab || getSelectedTab()
     );
     if (currentTab.multiselected) {
       tabs = gBrowser.selectedTabs;
@@ -1287,7 +1303,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
       return;
     }
     if (tabs.length < 2) {
-      gBrowser.selectedTab = tabs[0];
+      setSelectedTab(tabs[0]);
       this.createEmptySplit();
       return;
     }
@@ -1425,7 +1441,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
 
       const existingSplitTab = tabs.find(tab => tab.splitView);
       let shouldActivateSplit =
-        (initialIndex >= 0 || tabs.includes(window.gBrowser.selectedTab)) &&
+        (initialIndex >= 0 || tabs.includes(getSelectedTab())) &&
         !this._sessionRestoring;
 
       if (existingSplitTab) {
@@ -1495,7 +1511,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
       };
       this._data.push(splitData);
       if (shouldActivateSplit) {
-        window.gBrowser.selectedTab = tabs[tabIndexToUse] ?? tabs[0];
+        setSelectedTab(tabs[tabIndexToUse] ?? tabs[0]);
         this.activateSplitView(splitData);
       } else {
         for (const tab of tabs) {
@@ -1681,12 +1697,14 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
     headerContainer.classList.add("zen-view-splitter-header-container");
     const header = document.createElement("div");
     header.classList.add("zen-view-splitter-header");
-    const removeButton = document.createXULElement("toolbarbutton");
+    const removeButton = createXULElementLocal("toolbarbutton");
+    // Chromium: document.createElement("toolbarbutton").
     removeButton.classList.add("zen-tab-unsplit-button");
     removeButton.addEventListener("click", event => {
       this.removeTabFromSplit(event, container);
     });
-    const rearrangeButton = document.createXULElement("toolbarbutton");
+    const rearrangeButton = createXULElementLocal("toolbarbutton");
+    // Chromium: document.createElement("toolbarbutton").
     rearrangeButton.classList.add("zen-tab-rearrange-button");
     header.appendChild(rearrangeButton);
     header.appendChild(removeButton);
@@ -1842,11 +1860,11 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
       return;
     }
     const container = event.currentTarget.closest(".browserSidebarContainer");
-    const tab = window.gBrowser.tabs.find(
+    const tab = getTabs().find(
       t => t.linkedBrowser?.closest(".browserSidebarContainer") === container
     );
     if (tab) {
-      window.gBrowser.selectedTab = tab;
+      setSelectedTab(tab);
     }
   };
 
@@ -1934,7 +1952,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
       // zenModeActive allow us to avoid setting docShellisActive to false later on,
       // see browser-custom-elements.js's patch
       tab.linkedBrowser.zenModeActive = active;
-      if (!active && tab === gBrowser.selectedTab) {
+      if (!active && tab === getSelectedTab()) {
         continue;
       }
       try {
@@ -2000,8 +2018,8 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
       return;
     }
     this.removeGroup(this.currentView);
-    const currentTab = window.gBrowser.selectedTab;
-    window.gBrowser.selectedTab = currentTab;
+    const currentTab = getSelectedTab();
+    setSelectedTab(currentTab);
   }
 
   /**
@@ -2025,6 +2043,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
     }
     const parentWindow = window.parent;
     const targetWindow = parentWindow || window;
+    // Gecko addTab; Chromium: chrome.tabs.create — see tabs adapter.
     const tab = targetWindow.gBrowser.addTab(url, {
       ...options,
       triggeringPrincipal,
@@ -2042,7 +2061,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
     if (tabs.length < 2) {
       return;
     }
-    let nextTabIndex = tabs.indexOf(gBrowser.selectedTab) + 1;
+    let nextTabIndex = tabs.indexOf(getSelectedTab()) + 1;
     if (nextTabIndex >= tabs.length) {
       // Find the first non-hidden tab
       nextTabIndex = tabs.findIndex(tab => !tab.hidden);
@@ -2079,7 +2098,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
   removeTabFromSplit = (event, container) => {
     const browser = container.querySelector("browser");
     if (browser) {
-      const tab = gBrowser.getTabForBrowser(browser);
+      const tab = getTabForBrowser(browser);
       if (tab) {
         const groupIndex = this._data.findIndex(group =>
           group.tabs.includes(tab)
@@ -2089,7 +2108,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
           this.removeTabFromGroup(tab, groupIndex, { forUnsplit: true });
         }
         if (!event.shiftKey) {
-          gBrowser.selectedTab = tab;
+          setSelectedTab(tab);
           tab._selected = true;
         }
       }
@@ -2109,7 +2128,7 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
       this.fakeBrowser.remove();
       delete this.fakeBrowser;
       if (select) {
-        gBrowser.selectedTab = this._draggingTab;
+        setSelectedTab(this._draggingTab);
         this._draggingTab = null;
       }
       for (const browser of gBrowser.browsers) {
@@ -2178,14 +2197,14 @@ class nsZenViewSplitter extends nsZenDOMOperatedFeature {
     }
 
     let droppedOnTab = gZenGlanceManager.getTabOrGlanceParent(
-      gBrowser.getTabForBrowser(browser)
+      getTabForBrowser(browser)
     );
     if (droppedOnTab === this._draggingTab) {
       this.createEmptySplit(dropSide);
       return true;
     }
 
-    gBrowser.selectedTab = this._draggingTab;
+    setSelectedTab(this._draggingTab);
     this._draggingTab = null;
     const browserContainer = draggedTab.linkedBrowser?.closest(
       ".browserSidebarContainer"

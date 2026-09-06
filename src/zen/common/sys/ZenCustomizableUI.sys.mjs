@@ -3,6 +3,12 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+// Gecko CustomizableUI area registration; Chromium: no equivalent — sidebar
+// buttons become extension action/popup HTML (see adapters/xul.mjs).
+import {
+  createXULElementLocal,
+  parseXULFragment,
+} from "../../adapters/xul.mjs";
 
 export const ZenCustomizableUI = new (class {
   constructor() {}
@@ -48,14 +54,15 @@ export const ZenCustomizableUI = new (class {
     const toolbox = window.gNavToolbox;
 
     // Set a splitter to navigator-toolbox
-    const splitter = window.document.createXULElement("splitter");
+    const splitter = createXULElementLocal("splitter");
+    // Chromium: HTML <hr> / div splitter.
     splitter.setAttribute("id", "zen-sidebar-splitter");
     splitter.setAttribute("orient", "horizontal");
     splitter.setAttribute("resizebefore", "sibling");
     splitter.setAttribute("resizeafter", "none");
     toolbox.insertAdjacentElement("afterend", splitter);
 
-    const sidebarBox = window.MozXULElement.parseXULToFragment(`
+    const sidebarBox = parseXULFragment(`
       <toolbar id="zen-sidebar-top-buttons"
         fullscreentoolbar="true"
         class="browser-toolbar customization-target"

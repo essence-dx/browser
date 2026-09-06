@@ -5,7 +5,15 @@
 import checkForZenUpdates, {
   createWindowUpdateAnimation,
   playWindowSweepAnimation,
-} from "chrome://browser/content/ZenUpdates.mjs";
+} from "./ZenUpdates.mjs";
+import {
+  getBoolPref,
+  setBoolPref,
+  setStringPref,
+} from "../../adapters/prefs.mjs";
+// Gecko now; Chromium: chrome.storage.local — same adapter surface.
+// Welcome loader below uses a relative path (was chrome://); Chromium loads
+// the welcome module via chrome.runtime.getURL.
 
 class ZenStartup {
   #watermarkIgnoreElements = ["zen-toast-container", "zen-browser-background"];
@@ -23,7 +31,7 @@ class ZenStartup {
 
   get #shouldUseWatermark() {
     return (
-      Services.prefs.getBoolPref("zen.watermark.enabled", false) &&
+      getBoolPref("zen.watermark.enabled", false) &&
       gZenWorkspaces.shouldHaveWorkspaces
     );
   }
@@ -170,21 +178,22 @@ class ZenStartup {
   #checkForWelcomePage() {
     const kWelcomeScreenSeenPref = "zen.welcome-screen.seen";
     if (Services.env.get("MOZ_HEADLESS")) {
-      Services.prefs.setBoolPref(kWelcomeScreenSeenPref, true);
+      setBoolPref(kWelcomeScreenSeenPref, true);
       return;
     }
-    if (!Services.prefs.getBoolPref(kWelcomeScreenSeenPref, false)) {
-      Services.prefs.setBoolPref(kWelcomeScreenSeenPref, true);
-      Services.prefs.setStringPref(
+    if (!getBoolPref(kWelcomeScreenSeenPref, false)) {
+      setBoolPref(kWelcomeScreenSeenPref, true);
+      setStringPref(
         "zen.updates.last-build-id",
         Services.appinfo.appBuildID
       );
-      Services.prefs.setStringPref(
+      setStringPref(
         "zen.updates.last-version",
         Services.appinfo.version
       );
       Services.scriptloader.loadSubScript(
-        "chrome://browser/content/zen-components/ZenWelcome.mjs",
+        "../../welcome/ZenWelcome.mjs",
+        // was: chrome://browser/content/zen-components/ZenWelcome.mjs
         window
       );
     } else {

@@ -2,6 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import { getBoolPref } from "../adapters/prefs.mjs";
+import { getSelectedTab, getTabForBrowser } from "../adapters/tabs.mjs";
+// Gecko now; Chromium: chrome.tabs/query + MediaSession API — wire when
+// surfer.json migration.engine === "chromium".
+
 const lazy = {};
 XPCOMUtils.defineLazyPreferenceGetter(
   lazy,
@@ -72,7 +77,8 @@ class ZenMediaCard {
       this.element.setAttribute("media-sharing", "");
       this.element.setAttribute("media-position-hidden", "true");
       this.titleEl.textContent =
-        window.gBrowser.getTabForBrowser(browser)?.label || "";
+        getTabForBrowser(browser)?.label || "";
+      // Chromium: (await chrome.tabs.get(browser.tabId))?.title.
       this.artistEl.textContent = "";
       this.updateIcon();
     }
@@ -92,7 +98,8 @@ class ZenMediaCard {
     if (this.controller.isBeingUsedInPIPModeOrFullscreen) {
       return false;
     }
-    return gBrowser.selectedBrowser.browserId !== this.browser.browserId;
+    return getSelectedTab()?.linkedBrowser?.browserId !== this.browser.browserId;
+    // Chromium: (await chrome.tabs.query({active:true,currentWindow:true}))[0]?.id.
   }
 
   #initListeners() {
@@ -329,7 +336,8 @@ class ZenMediaCard {
     if (this.controller) {
       this.controller.focus();
     } else {
-      const tab = window.gBrowser.getTabForBrowser(this.browser);
+      const tab = getTabForBrowser(this.browser);
+      // Chromium: chrome.tabs.get(browser.tabId).
       if (tab) {
         window.gZenWorkspaces.switchTabIfNeeded(tab);
       }
@@ -337,7 +345,8 @@ class ZenMediaCard {
   }
 
   onMute() {
-    const tab = window.gBrowser.getTabForBrowser(this.browser);
+    const tab = getTabForBrowser(this.browser);
+    // Chromium: chrome.tabs.get(browser.tabId) + audible/mutedInfo.
     if (tab) {
       tab.toggleMuteAudio();
       this.updateMuteState();
@@ -474,7 +483,8 @@ class nsZenMediaController {
   mediaControlBar = null;
 
   init() {
-    if (!Services.prefs.getBoolPref("zen.mediacontrols.enabled", true)) {
+    if (!getBoolPref("zen.mediacontrols.enabled", true)) {
+      // Chromium: (await chrome.storage.local.get(...)) — see adapters/prefs.mjs.
       return;
     }
 
@@ -599,6 +609,7 @@ class nsZenMediaController {
     const shouldShow = showCameraIndicator || showMicrophoneIndicator;
 
     for (const browser of window.gBrowser.browsers) {
+      // Chromium: chrome.tabs.query({}) — iterate tab list instead.
       if (browser.innerWindowID !== windowId) {
         continue;
       }

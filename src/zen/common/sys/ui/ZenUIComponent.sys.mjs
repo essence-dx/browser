@@ -45,10 +45,12 @@ export class ZenUIComponent {
   }
 
   listenBrowserTabsProgress() {
+    // Gecko tab-progress listeners; Chromium: chrome.tabs.onUpdated.
     this.#window.gBrowser.addTabsProgressListener(this);
   }
 
   listenBrowserProgress() {
+    // Gecko progress listener; Chromium: chrome.tabs.onUpdated.
     this.#window.gBrowser.addProgressListener(this);
   }
 

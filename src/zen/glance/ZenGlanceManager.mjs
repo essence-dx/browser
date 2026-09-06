@@ -4,7 +4,17 @@
 
 /* eslint-disable consistent-return */
 
-import { nsZenDOMOperatedFeature } from "chrome://browser/content/zen-components/ZenCommonUtils.mjs";
+import { nsZenDOMOperatedFeature } from "../common/modules/ZenCommonUtils.mjs";
+import { getBoolPref, getIntPref, getStringPref } from "../adapters/prefs.mjs";
+import { createXULElementLocal } from "../adapters/xul.mjs";
+import {
+  getSelectedTab,
+  setSelectedTab,
+  getTabForBrowser,
+  pinTab,
+} from "../adapters/tabs.mjs";
+// Gecko now (gBrowser/PlacesUtils/SessionStore below); Chromium: chrome.tabs +
+// chrome.storage.session — wire when migration.engine === "chromium".
 
 const GLANCE_BACKGROUND_SCALE = 0.97;
 
@@ -39,7 +49,7 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
     ARC_HEIGHT_RATIO: 0.2, // Arc height = distance * ratio (capped at MAX_ARC_HEIGHT)
   });
 
-  #GLANCE_ANIMATION_DURATION = Services.prefs.getIntPref(
+  #GLANCE_ANIMATION_DURATION = getIntPref(
     "zen.glance.animation-duration"
   );
 
@@ -73,11 +83,13 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
   }
 
   #setupObservers() {
+    // Gecko observer; Chromium: chrome.runtime.onSuspend listener.
     Services.obs.addObserver(this, "quit-application-requested");
   }
 
   #insertIntoContextMenu() {
-    const menuitem = document.createXULElement("menuitem");
+    const menuitem = createXULElementLocal("menuitem");
+    // Chromium: document.createElement("menuitem").
     menuitem.setAttribute("id", "context-zenOpenLinkInGlance");
     menuitem.setAttribute("hidden", "true");
     menuitem.setAttribute("data-l10n-id", "zen-open-link-in-glance");
@@ -197,7 +209,8 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
     this.#configureNewTab(newTab, currentTab, newUUID);
     this.#registerGlance(newTab, currentTab, newUUID);
 
-    gBrowser.selectedTab = newTab;
+    setSelectedTab(newTab);
+    // Chromium: chrome.tabs.update(newTab.id, {active:true}).
     return this.#currentBrowser;
   }
 
@@ -387,8 +400,8 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
       return Promise.resolve(this.#currentTab);
     }
 
-    if (gBrowser.selectedTab === this.#currentParentTab) {
-      gBrowser.selectedTab = this.#currentTab;
+    if (getSelectedTab() === this.#currentParentTab) {
+      setSelectedTab(this.#currentTab);
       return Promise.resolve(this.#currentTab);
     }
 
@@ -521,7 +534,8 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
   }
 
   #createGlancePreviewElement(src) {
-    const imageDataElement = document.createXULElement("image");
+    const imageDataElement = createXULElementLocal("image");
+    // Chromium: document.createElement("image").
     imageDataElement.setAttribute("src", src);
 
     // eslint-disable-next-line no-shadow
@@ -588,7 +602,7 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
 
     this.#animateParentBackground();
     let activeValue = browserElement.zenModeActive;
-    let shouldDeactivateDocShell = Services.prefs.getBoolPref(
+    let shouldDeactivateDocShell = getBoolPref(
       "zen.glance.deactivate-docshell-during-animation"
     );
     if (shouldDeactivateDocShell) {
@@ -1206,8 +1220,8 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
       this.#currentParentTab._visuallySelected = false;
     }
 
-    if (gBrowser.selectedTab === lastCurrentTab) {
-      gBrowser.selectedTab = this.#currentParentTab;
+    if (getSelectedTab() === lastCurrentTab) {
+      setSelectedTab(this.#currentParentTab);
     }
 
     if (
@@ -1428,7 +1442,7 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
     }
 
     this.#currentGlanceID = tab.getAttribute("glance-id");
-    if (gBrowser.selectedTab === this.#currentTab) {
+    if (getSelectedTab() === this.#currentTab) {
       this.#onLocationChangeOpenGlance(prevTab);
       return;
     }
@@ -1555,7 +1569,7 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
       this._lazyPref.SHOULD_OPEN_EXTERNAL_TABS_IN_GLANCE &&
       owner.linkedBrowser?.browsingContext?.isAppTab &&
       this.tabDomainsDiffer(owner, uri) &&
-      Services.prefs.getBoolPref("zen.glance.enabled", true)
+      getBoolPref("zen.glance.enabled", true)
     );
   }
 
@@ -1566,7 +1580,8 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
    * @param {nsIURI} uri - The URI being opened
    */
   onTabOpen(browser, uri) {
-    const tab = gBrowser.getTabForBrowser(browser);
+    const tab = getTabForBrowser(browser);
+    // Chromium: chrome.tabs.get(browser.tabId).
     if (!tab) {
       return;
     }
@@ -1657,10 +1672,10 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
   #handleZenFolderPinning() {
     const isZenFolder = this.#currentParentTab?.group?.isZenFolder;
     if (
-      Services.prefs.getBoolPref("zen.folders.owned-tabs-in-folder") &&
+      getBoolPref("zen.folders.owned-tabs-in-folder") &&
       isZenFolder
     ) {
-      gBrowser.pinTab(this.#currentTab);
+      pinTab(this.#currentTab);
     }
   }
 
@@ -1672,7 +1687,7 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
     this.#clearContainerStyles(this.browserWrapper);
     this.#currentTab.removeAttribute("glance-id");
     this.#currentParentTab.removeAttribute("glance-id");
-    gBrowser.selectedTab = this.#currentTab;
+    setSelectedTab(this.#currentTab);
 
     this.#currentParentTab.linkedBrowser
       .closest(".browserSidebarContainer")
@@ -1713,7 +1728,7 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
    * @param {Event} event - The bookmark click event
    */
   openGlanceForBookmark(event) {
-    const activationMethod = Services.prefs.getStringPref(
+    const activationMethod = getStringPref(
       "zen.glance.activation-method",
       "ctrl"
     );
@@ -1822,10 +1837,10 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
   #handleZenFolderPinningForSplit(parentTab) {
     const isZenFolder = parentTab?.group?.isZenFolder;
     if (
-      Services.prefs.getBoolPref("zen.folders.owned-tabs-in-folder") &&
+      getBoolPref("zen.folders.owned-tabs-in-folder") &&
       isZenFolder
     ) {
-      gBrowser.pinTab(this.#currentTab);
+      pinTab(this.#currentTab);
     }
   }
 
@@ -1872,8 +1887,8 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
       return false;
     }
 
-    const currentTab = gBrowser.getTabForBrowser(currentBrowser);
-    const oldTab = gBrowser.getTabForBrowser(oldBrowser);
+    const currentTab = getTabForBrowser(currentBrowser);
+    const oldTab = getTabForBrowser(oldBrowser);
 
     if (!currentTab || !oldTab) {
       return false;
@@ -1906,7 +1921,7 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
       return;
     }
 
-    const currentTab = gBrowser.selectedTab;
+    const currentTab = getSelectedTab();
     const parentTab = currentTab.owner;
 
     if (!parentTab || parentTab.hasAttribute("glance-id")) {
@@ -1923,8 +1938,8 @@ class nsZenGlanceManager extends nsZenDOMOperatedFeature {
    */
   #isGlanceEnabledForSearch() {
     return (
-      Services.prefs.getBoolPref("zen.glance.enabled", false) &&
-      Services.prefs.getBoolPref("zen.glance.enable-contextmenu-search", true)
+      getBoolPref("zen.glance.enabled", false) &&
+      getBoolPref("zen.glance.enable-contextmenu-search", true)
     );
   }
 

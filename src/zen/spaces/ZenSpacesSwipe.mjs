@@ -2,6 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+import { getIntPref, setBoolPref } from "../adapters/prefs.mjs";
+// Gecko now; Chromium: chrome.storage.local — same adapter surface.
+
 const lazy = {};
 
 ChromeUtils.defineLazyGetter(lazy, "browserBackgroundElement", () => {
@@ -116,7 +119,7 @@ export class ZenSpacesSwipe {
       lastDelta: 0,
       direction: null,
     };
-    Services.prefs.setBoolPref("zen.swipe.is-fast-swipe", true);
+    setBoolPref("zen.swipe.is-fast-swipe", true);
   }
 
   _handleSwipeUpdate(event) {
@@ -133,7 +136,7 @@ export class ZenSpacesSwipe {
 
     const delta =
       event.delta *
-      Services.prefs.getIntPref(
+      getIntPref(
         "zen.workspaces.swipe-actions.delta-multiplier"
       );
     let translateX = this._swipeState.lastDelta + delta;
@@ -186,7 +189,7 @@ export class ZenSpacesSwipe {
       direction: null,
     };
 
-    Services.prefs.setBoolPref("zen.swipe.is-fast-swipe", false);
+    setBoolPref("zen.swipe.is-fast-swipe", false);
     document.documentElement.removeAttribute("swipe-gesture");
     gZenUIManager.tabsWrapper.style.removeProperty("scrollbar-width");
     [lazy.browserBackgroundElement, lazy.toolbarBackgroundElement].forEach(

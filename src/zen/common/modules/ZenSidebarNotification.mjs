@@ -4,6 +4,9 @@
 
 import { html } from "chrome://global/content/vendor/lit.all.mjs";
 import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
+// Gecko Lit (chrome://global vendor); Chromium: npm lit + HTMLElement base —
+// swap these two imports and the MozLitElement base when migration.engine
+// === "chromium".
 
 const lazy = {};
 

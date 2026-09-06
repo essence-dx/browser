@@ -2,6 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import { getBoolPref, getIntPref, setIntPref } from "../../adapters/prefs.mjs";
+import { createXULElementLocal, parseXULFragment } from "../../adapters/xul.mjs";
+// Gecko now (XUL menubar); Chromium: HTML menu — wire when migration.engine
+// === "chromium".
+
 const WINDOW_SCHEME_PREF = "zen.view.window.scheme";
 const WINDOW_SCHEME_MAPPING = {
   dark: 0,
@@ -28,7 +33,7 @@ export class nsZenMenuBar {
   }
 
   #initViewMenu() {
-    let appearanceMenu = window.MozXULElement.parseXULToFragment(`
+    let appearanceMenu = parseXULFragment(`
       <menu data-l10n-id="zen-menubar-appearance">
         <menupopup>
           <menuitem data-l10n-id="zen-menubar-appearance-description" disabled="true" />
@@ -41,15 +46,15 @@ export class nsZenMenuBar {
     menu.addEventListener("command", event => {
       const type = event.target.getAttribute("data-type");
       const schemeValue = WINDOW_SCHEME_MAPPING[type];
-      Services.prefs.setIntPref(WINDOW_SCHEME_PREF, schemeValue);
+      setIntPref(WINDOW_SCHEME_PREF, schemeValue);
     });
     const viewMenu = document.getElementById("view-menu");
     const parentPopup = viewMenu.querySelector("menupopup");
-    parentPopup.prepend(document.createXULElement("menuseparator"));
+    parentPopup.prepend(createXULElementLocal("menuseparator"));
     parentPopup.prepend(menu);
 
     const sibling = document.getElementById("viewSidebarMenuMenu");
-    const togglePinnedItem = window.MozXULElement.parseXULToFragment(
+    const togglePinnedItem = parseXULFragment(
       '<menuitem data-l10n-id="zen-menubar-toggle-pinned-tabs"' +
         ' data-l10n-args="{&quot;pinnedAreCollapsed&quot;:&quot;&quot;}" />'
     ).querySelector("menuitem");
@@ -58,7 +63,7 @@ export class nsZenMenuBar {
     }
 
     parentPopup.addEventListener("popupshowing", () => {
-      const currentScheme = Services.prefs.getIntPref(WINDOW_SCHEME_PREF);
+      const currentScheme = getIntPref(WINDOW_SCHEME_PREF);
       for (const [type, value] of Object.entries(WINDOW_SCHEME_MAPPING)) {
         let menuItem = menu.querySelector(`menuitem[data-type="${type}"]`);
         if (value === currentScheme) {
@@ -79,7 +84,7 @@ export class nsZenMenuBar {
   }
 
   #initSpacesMenu() {
-    let spacesMenubar = window.MozXULElement.parseXULToFragment(`
+    let spacesMenubar = parseXULFragment(`
       <menu id="zen-spaces-menubar" data-l10n-id="zen-panel-ui-spaces-label">
         <menupopup>
           <menuitem data-l10n-id="zen-panel-ui-workspaces-create" command="cmd_zenOpenWorkspaceCreation"/>
@@ -112,7 +117,7 @@ export class nsZenMenuBar {
   }
 
   #initAppMenu() {
-    const openUnsyncedWindowItem = window.MozXULElement.parseXULToFragment(
+    const openUnsyncedWindowItem = parseXULFragment(
       `<toolbarbutton id="appMenu-new-zen-unsynced-window-button"
                 class="subviewbutton"
                 data-l10n-id="zen-appmenu-new-blank-window"
@@ -123,7 +128,7 @@ export class nsZenMenuBar {
       openUnsyncedWindowItem
     );
     document.getElementById("menu_newNavigator").after(
-      window.MozXULElement.parseXULToFragment(`
+      parseXULFragment(`
         <menuitem id="menu_new_zen_unsynced_window"
                 class="subviewbutton"
                 data-l10n-id="zen-menubar-new-blank-window"
@@ -133,7 +138,7 @@ export class nsZenMenuBar {
   }
 
   #hideWindowRestoreMenus() {
-    if (!Services.prefs.getBoolPref("zen.window-sync.enabled", true)) {
+    if (!getBoolPref("zen.window-sync.enabled", true)) {
       return;
     }
     const itemsToHide = [

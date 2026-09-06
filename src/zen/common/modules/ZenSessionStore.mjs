@@ -2,7 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { nsZenPreloadedFeature } from "chrome://browser/content/zen-components/ZenCommonUtils.mjs";
+import { nsZenPreloadedFeature } from "./ZenCommonUtils.mjs";
+import { getAllWindowsRestoredPromise } from "../../adapters/session.mjs";
+// Gecko SessionStore init gate; Chromium: chrome.sessions / storage.session —
+// same adapter surface (see adapters/session.mjs).
 
 class ZenSessionStore extends nsZenPreloadedFeature {
   init() {
@@ -42,7 +45,7 @@ class ZenSessionStore extends nsZenPreloadedFeature {
   }
 
   async #waitAndCleanup() {
-    await SessionStore.promiseInitialized;
+    await getAllWindowsRestoredPromise();
     this.#cleanup();
   }
 

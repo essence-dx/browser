@@ -2,7 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { nsZenDOMOperatedFeature } from "chrome://browser/content/zen-components/ZenCommonUtils.mjs";
+import { nsZenDOMOperatedFeature } from "../common/modules/ZenCommonUtils.mjs";
+import { getBoolPref, getIntPref } from "../adapters/prefs.mjs";
+import { createXULElementLocal, parseXULFragment } from "../adapters/xul.mjs";
+import {
+  getSelectedTab,
+  setSelectedTab,
+  getTabForBrowser,
+  getTabs,
+  pinTab,
+} from "../adapters/tabs.mjs";
+// Gecko now (gBrowser tab-strip API below); Chromium: chrome.tabs/tabGroups —
+// wire when surfer.json migration.engine === "chromium".
 
 function formatRelativeTime(timestamp) {
   const now = Date.now();
@@ -36,7 +47,7 @@ function groupIsCollapsiblePins(group) {
 }
 
 class nsZenFolders extends nsZenDOMOperatedFeature {
-  #ZEN_MAX_SUBFOLDERS = Services.prefs.getIntPref(
+  #ZEN_MAX_SUBFOLDERS = getIntPref(
     "zen.folders.max-subfolders",
     5
   );
@@ -66,7 +77,7 @@ class nsZenFolders extends nsZenDOMOperatedFeature {
   }
 
   #initContextMenu() {
-    const contextMenuItems = window.MozXULElement.parseXULToFragment(`
+    const contextMenuItems = parseXULFragment(`
       <menu data-l10n-id="zen-toolbar-context-move-to-folder" id="context_zenMoveToFolder">
         <menupopup>
           <menuseparator />
@@ -75,7 +86,7 @@ class nsZenFolders extends nsZenDOMOperatedFeature {
       </menu>
     `);
     document.getElementById("context_moveTabToGroup").before(contextMenuItems);
-    const contextMenuItemsToolbar = window.MozXULElement.parseXULToFragment(
+    const contextMenuItemsToolbar = parseXULFragment(
       `<menuitem id="zen-context-menu-new-folder-toolbar" data-l10n-id="zen-toolbar-context-new-folder"/>
        <menu data-l10n-id="zen-panel-ui-live-folder-create" id="zen-panel-ui-live-folder-create">
          <menupopup>
@@ -267,7 +278,8 @@ class nsZenFolders extends nsZenDOMOperatedFeature {
       separator.hidden = groups.length === 0;
       for (const group of groups) {
         const icon = group.iconURL;
-        const menuItem = document.createXULElement("menuitem");
+        const menuItem = createXULElementLocal("menuitem");
+        // Chromium: document.createElement("menuitem").
         menuItem.setAttribute("label", group.label);
         menuItem.classList.add("context-zen-move-to-folder-item");
         if (icon) {
@@ -741,7 +753,7 @@ class nsZenFolders extends nsZenDOMOperatedFeature {
   }
 
   _createFolderNode(options = {}) {
-    const folder = document.createXULElement("zen-folder", {
+    const folder = createXULElementLocal("zen-folder", {
       is: "zen-folder",
     });
     let id = options.id;
@@ -1018,7 +1030,7 @@ class nsZenFolders extends nsZenDOMOperatedFeature {
       );
 
       item.addEventListener("click", () => {
-        gBrowser.selectedTab = tab;
+        setSelectedTab(tab);
       });
 
       item.addEventListener("mouseenter", () => {
@@ -1178,7 +1190,7 @@ class nsZenFolders extends nsZenDOMOperatedFeature {
       }
       this.#mouseTimer = setTimeout(() => {
         this.openTabsPopup(event);
-      }, Services.prefs.getIntPref("zen.folders.search.hover-delay"));
+      }, getIntPref("zen.folders.search.hover-delay"));
     });
     labelContainer.addEventListener("mouseleave", () => {
       clearTimeout(this.#mouseTimer);

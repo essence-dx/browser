@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { nsZenFolder } from "chrome://browser/content/zen-components/ZenFolder.mjs";
+import { nsZenFolder } from "../folders/ZenFolder.mjs";
 
 // A helper class to manage collapsible pinned tabs in a workspace.
 

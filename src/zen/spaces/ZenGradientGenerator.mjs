@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { nsZenMultiWindowFeature } from "chrome://browser/content/zen-components/ZenCommonUtils.mjs";
+import { nsZenMultiWindowFeature } from "../common/modules/ZenCommonUtils.mjs";
 
 function parseSinePath(pathStr) {
   const points = [];

@@ -2,6 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import { getBoolPref } from "../../adapters/prefs.mjs";
+import { getSelectedTab } from "../../adapters/tabs.mjs";
+// Gecko now (gBrowser selectedTab below); Chromium: chrome.tabs.query —
+// same tabs-adapter surface.
+
 window.gZenOperatingSystemCommonUtils = {
   kZenOSToSmallName: {
     WINNT: "windows",
@@ -91,7 +96,7 @@ window.gZenCommonActions = {
 
     try {
       if (
-        Services.prefs.getBoolPref("browser.urlbar.decodeURLsOnCopy", false) &&
+        getBoolPref("browser.urlbar.decodeURLsOnCopy", false) &&
         !currentUrl.schemeIs("data")
       ) {
         displaySpec = decodeURI(displaySpec);
@@ -128,12 +133,12 @@ window.gZenCommonActions = {
 
   copyCurrentURLAsMarkdownToClipboard() {
     const [currentUrl, ClipboardHelper] = gURLBar.zenStrippedURI;
-    const tabTitle = gBrowser.selectedTab.label;
+    const tabTitle = getSelectedTab().label;
     let displaySpec = currentUrl.displaySpec;
 
     try {
       if (
-        Services.prefs.getBoolPref("browser.urlbar.decodeURLsOnCopy", false) &&
+        getBoolPref("browser.urlbar.decodeURLsOnCopy", false) &&
         !currentUrl.schemeIs("data")
       ) {
         displaySpec = decodeURI(displaySpec);
@@ -165,14 +170,14 @@ window.gZenCommonActions = {
    */
   shouldCloseTabOnBack() {
     if (
-      !Services.prefs.getBoolPref(
+      !getBoolPref(
         "zen.tabs.close-on-back-with-no-history",
         true
       )
     ) {
       return false;
     }
-    const tab = gBrowser.selectedTab;
+    const tab = getSelectedTab();
     return Boolean(
       tab.owner && !tab.pinned && !tab.hasAttribute("zen-empty-tab")
     );

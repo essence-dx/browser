@@ -4,8 +4,18 @@
 
 /* eslint-disable no-shadow */
 
-import { nsZenThemePicker } from "resource:///modules/zen/ZenGradientGenerator.mjs";
-import { ZenSpacesSwipe } from "resource:///modules/zen/ZenSpacesSwipe.mjs";
+import { nsZenThemePicker } from "../spaces/ZenGradientGenerator.mjs";
+import { ZenSpacesSwipe } from "../spaces/ZenSpacesSwipe.mjs";
+import {
+  getBoolPref,
+  getIntPref,
+  getStringPref,
+  setStringPref,
+} from "../adapters/prefs.mjs";
+import { createXULElementLocal } from "../adapters/xul.mjs";
+import { getSelectedTab, setSelectedTab } from "../adapters/tabs.mjs";
+// Gecko now (tab-strip/observer APIs below); Chromium: chrome.tabs/tabGroups +
+// chrome.storage — wire when surfer.json migration.engine === "chromium".
 
 const lazy = {};
 
@@ -49,7 +59,7 @@ class nsZenWorkspaces {
 
   #hasInitialized = false;
 
-  #canDebug = Services.prefs.getBoolPref("zen.workspaces.debug", false);
+  #canDebug = getBoolPref("zen.workspaces.debug", false);
   #activeWorkspace = "";
 
   _workspaceCache = [];
@@ -129,7 +139,7 @@ class nsZenWorkspaces {
       "zen.workspaces.open-new-tab-if-last-unpinned-tab-is-closed",
       false
     );
-    this.containerSpecificEssentials = Services.prefs.getBoolPref(
+    this.containerSpecificEssentials = getBoolPref(
       "zen.workspaces.separate-essentials",
       false
     );
@@ -139,7 +149,7 @@ class nsZenWorkspaces {
     ChromeUtils.defineLazyGetter(this, "workspaceIcons", () =>
       document.getElementById("zen-workspaces-button")
     );
-    this.#activeWorkspace ||= Services.prefs.getStringPref(
+    this.#activeWorkspace ||= getStringPref(
       "zen.workspaces.active",
       ""
     );
@@ -208,7 +218,7 @@ class nsZenWorkspaces {
 
     // Non UI related initializations
     if (
-      Services.prefs.getBoolPref("zen.workspaces.swipe-actions", false) &&
+      getBoolPref("zen.workspaces.swipe-actions", false) &&
       this.workspaceEnabled &&
       !this.isPrivateWindow
     ) {
@@ -257,14 +267,14 @@ class nsZenWorkspaces {
         !this._emptyTab.documentGlobal.closed &&
         gZenVerticalTabsManager._canReplaceNewTab
       ) {
-        gBrowser.selectedTab = this._emptyTab;
+        setSelectedTab(this._emptyTab);
         return this._emptyTab;
       }
 
       // Fall back to creating a new tab
       const newTabUrl =
         newTabTarget ||
-        Services.prefs.getStringPref("browser.startup.homepage");
+        getStringPref("browser.startup.homepage");
       let tab = gZenUIManager.openAndChangeToTab(newTabUrl);
 
       // Set workspace ID if available
@@ -419,7 +429,7 @@ class nsZenWorkspaces {
       `.zen-essentials-container[container="${container}"]`
     );
     if (!essentialsContainer) {
-      essentialsContainer = document.createXULElement("hbox");
+      essentialsContainer = createXULElementLocal("hbox");
       essentialsContainer.className =
         "zen-essentials-container zen-workspace-tabs-section";
       essentialsContainer.setAttribute("flex", "1");
@@ -455,7 +465,8 @@ class nsZenWorkspaces {
   }
 
   #createWorkspaceTabsSection(workspace, tabs = []) {
-    const workspaceWrapper = document.createXULElement("zen-workspace");
+    const workspaceWrapper = createXULElementLocal("zen-workspace");
+    // Chromium: document.createElement("zen-workspace").
     const container = document.getElementById("tabbrowser-arrowscrollbox");
     workspaceWrapper.id = workspace.uuid;
     if (this.activeWorkspace === workspace.uuid) {
@@ -639,7 +650,7 @@ class nsZenWorkspaces {
     if (this.privateWindowOrDisabled) {
       return;
     }
-    Services.prefs.setStringPref("zen.workspaces.active", value);
+    setStringPref("zen.workspaces.active", value);
   }
 
   get isChangingWorkspace() {
@@ -843,9 +854,9 @@ class nsZenWorkspaces {
     let removedEmptyTab = false;
     let initialTabWasEmpty = false;
     if (this._initialTab || this._shouldOverrideTabs) {
-      let initialTab = this._initialTab || gBrowser.selectedTab;
+      let initialTab = this._initialTab || getSelectedTab();
       initialTabWasEmpty = !!initialTab._veryPossiblyEmpty;
-      gBrowser.selectedTab = initialTab;
+      setSelectedTab(initialTab);
       this.moveTabToWorkspace(initialTab, this.activeWorkspace);
       gBrowser.moveTabTo(initialTab, {
         forceUngrouped: true,
@@ -874,14 +885,14 @@ class nsZenWorkspaces {
         let tabToUse = gZenGlanceManager.getTabOrGlanceParent(
           tabs[this._tabToSelect + 1] || this._emptyTab
         );
-        gBrowser.selectedTab = tabToUse;
+        setSelectedTab(tabToUse);
         this._removedByStartupPage = true;
         gBrowser.removeTab(this._tabToRemoveForEmpty, {
           skipSessionStore: true,
         });
         cleanup();
       } else {
-        if (gBrowser.selectedTab === this._tabToRemoveForEmpty) {
+        if (getSelectedTab() === this._tabToRemoveForEmpty) {
           this.log(
             "Selecting empty tab because startup page didnt select a valid tab"
           );
@@ -901,12 +912,12 @@ class nsZenWorkspaces {
     }
 
     await selectPromise;
-    const openOnStartup = Services.prefs.getBoolPref(
+    const openOnStartup = getBoolPref(
       "zen.urlbar.open-on-startup",
       true
     );
     let shownEmptyTab =
-      gBrowser.selectedTab.hasAttribute("zen-empty-tab") && openOnStartup;
+      getSelectedTab().hasAttribute("zen-empty-tab") && openOnStartup;
     initialTabWasEmpty &&= openOnStartup;
 
     // Wait for the next event loop to ensure that the startup focus logic by
@@ -926,11 +937,11 @@ class nsZenWorkspaces {
 
     if (
       !gZenVerticalTabsManager._canReplaceNewTab &&
-      !Services.prefs.getBoolPref("zen.workspaces.continue-where-left-off")
+      !getBoolPref("zen.workspaces.continue-where-left-off")
     ) {
       // Go through each tab and see if there's another tab with the same startup URL.
       // If we do find one, remove it.
-      const newTabUrl = Services.prefs.getStringPref(
+      const newTabUrl = getStringPref(
         "browser.startup.homepage"
       );
       const tabs = gBrowser.tabs.filter(
@@ -999,7 +1010,7 @@ class nsZenWorkspaces {
   shouldCloseWindow() {
     return (
       !window.toolbar.visible ||
-      Services.prefs.getBoolPref("browser.tabs.closeWindowWithLastTab") ||
+      getBoolPref("browser.tabs.closeWindowWithLastTab") ||
       (this.privateWindowOrDisabled && !this.isPrivateWindow)
     );
   }
@@ -1123,7 +1134,7 @@ class nsZenWorkspaces {
   }
 
   generateMenuItemForWorkspace(workspace, disableCurrent = false) {
-    const item = document.createXULElement("menuitem");
+    const item = createXULElementLocal("menuitem");
     item.className = "zen-workspace-context-menu-item";
     item.setAttribute("zen-workspace-id", workspace.uuid);
     if (AppConstants.platform === "linux") {
@@ -1178,7 +1189,7 @@ class nsZenWorkspaces {
     );
     /* We can't show the rename input properly in collapsed state,
     so hide the workspace edit input */
-    const isCollapsed = !Services.prefs.getBoolPref(
+    const isCollapsed = !getBoolPref(
       "zen.view.sidebar-expanded"
     );
     workspaceName.hidden =
@@ -1311,7 +1322,7 @@ class nsZenWorkspaces {
 
   get shouldShowContainers() {
     return (
-      Services.prefs.getBoolPref("privacy.userContext.ui.enabled") &&
+      getBoolPref("privacy.userContext.ui.enabled") &&
       !!ContextualIdentityService.getPublicIdentities().length
     );
   }
@@ -1437,7 +1448,8 @@ class nsZenWorkspaces {
     await this.createAndSaveWorkspace("Space", undefined, false, 0, {
       insertAfterId: previousWorkspace?.uuid,
       beforeChangeCallback: async workspace => {
-        createForm = document.createXULElement("zen-workspace-creation");
+        createForm = createXULElementLocal("zen-workspace-creation");
+        // Chromium: document.createElement("zen-workspace-creation").
         createForm.setAttribute("workspace-id", workspace.uuid);
         createForm.setAttribute(
           "previous-workspace-id",
@@ -1557,7 +1569,7 @@ class nsZenWorkspaces {
   }
 
   moveTabsToWorkspace(tabs, workspaceID) {
-    const newTabPlacement = Services.prefs.getBoolPref(
+    const newTabPlacement = getBoolPref(
       "zen.view.show-newtab-button-top",
       false
     );
@@ -2004,7 +2016,7 @@ class nsZenWorkspaces {
   ) {
     gZenUIManager.tabsWrapper.style.scrollbarWidth = "none";
     const kGlobalAnimationDuration =
-      Services.prefs.getIntPref("zen.workspaces.switch-animation-duration") /
+      getIntPref("zen.workspaces.switch-animation-duration") /
       1000;
     this._animatingChange = true;
     const animations = [];
@@ -2138,8 +2150,8 @@ class nsZenWorkspaces {
       }
       element.active = offset === 0;
       if (offset === 0) {
-        if (tabToSelect != gBrowser.selectedTab && !onInit) {
-          gBrowser.selectedTab = tabToSelect;
+        if (tabToSelect != getSelectedTab() && !onInit) {
+          setSelectedTab(tabToSelect);
         }
       }
     }
@@ -2316,7 +2328,7 @@ class nsZenWorkspaces {
   }
 
   async _handleTabSelection(workspace, onInit, previousWorkspaceId) {
-    const currentSelectedTab = gBrowser.selectedTab;
+    const currentSelectedTab = getSelectedTab();
     const oldWorkspaceId = previousWorkspaceId;
     const lastSelectedTab = this.lastSelectedWorkspaceTabs[workspace.uuid];
 
@@ -2507,7 +2519,7 @@ class nsZenWorkspaces {
       if (!hasMultipleWorkspaces) {
         continue;
       }
-      const separator = document.createXULElement("menuseparator");
+      const separator = createXULElementLocal("menuseparator");
       separator.classList.add("zen-workspace-context-menu-item");
       if (isMoveTabPopup) {
         popup.prepend(separator);
@@ -2549,6 +2561,7 @@ class nsZenWorkspaces {
       name = this.isPrivateWindow ? "Incognito" : label;
       if (this.isPrivateWindow) {
         icon = "chrome://browser/skin/zen-icons/private-window-small.svg";
+        // Chromium: chrome.runtime.getURL("zen-icons/private-window-small.svg").
       }
     }
     let workspace = {
@@ -2604,8 +2617,9 @@ class nsZenWorkspaces {
       });
       let changed = !!extraTabs.length;
       if (changed) {
+        // Gecko tab-strip cache; Chromium: no-op (tab list re-queried).
         gBrowser.tabContainer._invalidateCachedTabs();
-        gBrowser.selectedTab = extraTabs[0];
+        setSelectedTab(extraTabs[0]);
       }
       await this.changeWorkspace(workspaceData);
     }
@@ -2793,7 +2807,7 @@ class nsZenWorkspaces {
   }
 
   #changeToEmptyTab() {
-    const isEmpty = gBrowser.selectedTab.hasAttribute("zen-empty-tab");
+    const isEmpty = getSelectedTab().hasAttribute("zen-empty-tab");
     gZenCompactModeManager.sidebar.toggleAttribute(
       "zen-has-empty-tab",
       isEmpty
@@ -3243,7 +3257,7 @@ class nsZenWorkspaces {
         }
         if (!workspaceToSwitch) {
           console.error("No workspace found for tab, cannot switch");
-          gBrowser.selectedTab = tab;
+          setSelectedTab(tab);
           return;
         }
 
@@ -3258,7 +3272,7 @@ class nsZenWorkspaces {
       }
 
       // Safely switch to the tab using our debounced method
-      gBrowser.selectedTab = tab;
+      setSelectedTab(tab);
     } catch (e) {
       console.error("Error in switchTabIfNeeded:", e);
     }
@@ -3362,7 +3376,7 @@ class nsZenWorkspaces {
   }
 
   handleTabCloseWindow() {
-    if (Services.prefs.getBoolPref("zen.tabs.close-window-with-empty")) {
+    if (getBoolPref("zen.tabs.close-window-with-empty")) {
       document.getElementById("cmd_closeWindow").doCommand();
     }
   }

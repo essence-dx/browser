@@ -2,7 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import createSidebarNotification from "chrome://browser/content/zen-components/ZenSidebarNotification.mjs";
+import createSidebarNotification from "./ZenSidebarNotification.mjs";
+import {
+  getBoolPref,
+  getStringPref,
+  setStringPref,
+} from "../../adapters/prefs.mjs";
+// Gecko now; Chromium: chrome.storage.local — same adapter surface.
 
 const ZEN_UPDATE_PREF = "zen.updates.last-version";
 const ZEN_BUILD_ID_PREF = "zen.updates.last-build-id";
@@ -11,16 +17,16 @@ const ZEN_UPDATE_NOTIFICATION_TIMEOUT_MS = 15000;
 
 export default function checkForZenUpdates() {
   const version = Services.appinfo.version;
-  const lastVersion = Services.prefs.getStringPref(ZEN_UPDATE_PREF, "");
-  Services.prefs.setStringPref(ZEN_UPDATE_PREF, version);
+  const lastVersion = getStringPref(ZEN_UPDATE_PREF, "");
+  setStringPref(ZEN_UPDATE_PREF, version);
   if (
     version === lastVersion ||
     gZenUIManager.testingEnabled ||
-    !Services.prefs.getBoolPref(ZEN_UPDATE_SHOW, true)
+    !getBoolPref(ZEN_UPDATE_SHOW, true)
   ) {
     return;
   }
-  const updateUrl = Services.prefs.getStringPref(
+  const updateUrl = getStringPref(
     "app.releaseNotesURL.prompt",
     ""
   );
@@ -47,6 +53,7 @@ export default function checkForZenUpdates() {
         },
         l10nId: "zen-sidebar-notification-restart-safe-mode",
         icon: "chrome://browser/skin/zen-icons/security-broken.svg",
+        // Chromium: chrome.runtime.getURL("zen-icons/security-broken.svg").
       },
     ],
   });
@@ -55,12 +62,12 @@ export default function checkForZenUpdates() {
 export async function createWindowUpdateAnimation() {
   const appID = Services.appinfo.appBuildID;
   if (
-    Services.prefs.getStringPref(ZEN_BUILD_ID_PREF, "") === appID ||
+    getStringPref(ZEN_BUILD_ID_PREF, "") === appID ||
     gZenUIManager.testingEnabled
   ) {
     return;
   }
-  Services.prefs.setStringPref(ZEN_BUILD_ID_PREF, appID);
+  setStringPref(ZEN_BUILD_ID_PREF, appID);
   await playWindowSweepAnimation();
 }
 

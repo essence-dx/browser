@@ -2,7 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { nsZenDOMOperatedFeature } from "chrome://browser/content/zen-components/ZenCommonUtils.mjs";
+import { nsZenDOMOperatedFeature } from "../modules/ZenCommonUtils.mjs";
+import { createXULElementLocal } from "../../adapters/xul.mjs";
+// Gecko now (toolbarbutton XUL); Chromium: HTML button — same adapter surface.
 
 // prettier-ignore
 const SVG_ICONS = [
@@ -178,7 +180,7 @@ class nsZenEmojiPicker extends nsZenDOMOperatedFeature {
     if (allowEmojis) {
       const emojiList = this.emojiList;
       for (const emoji of this.#emojis) {
-        const item = document.createXULElement("toolbarbutton");
+        const item = createXULElementLocal("toolbarbutton");
         item.className = "toolbarbutton-1 zen-emojis-picker-emoji";
         item.setAttribute("label", emoji.emoji);
         item.setAttribute("tooltiptext", "");

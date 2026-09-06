@@ -2,16 +2,29 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { nsZenMultiWindowFeature } from "chrome://browser/content/zen-components/ZenCommonUtils.mjs";
-import { nsZenMenuBar } from "chrome://browser/content/zen-components/ZenMenubar.mjs";
-import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
+import { nsZenMultiWindowFeature } from "./ZenCommonUtils.mjs";
+import { nsZenMenuBar } from "./ZenMenubar.mjs";
+// Gecko: UrlbarShared (toolkit urlbar) — Lane 3 migrates urlbar/ to omnibox;
+// Chromium: chrome.omnibox — see src/zen/urlbar (Lane 3).
+// import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
+import { getBoolPref, getIntPref, setBoolPref } from "../../adapters/prefs.mjs";
+import {
+  createXULElementLocal,
+  parseXULFragment,
+} from "../../adapters/xul.mjs";
+import {
+  getSelectedTab,
+  setSelectedTab,
+  getTabForBrowser,
+} from "../../adapters/tabs.mjs";
+// Gecko now; Chromium: chrome.storage + chrome.tabs — same adapter surface.
 
 window.gZenUIManager = {
   _popupTrackingElements: [],
   _hoverPausedForExpand: false,
   _hasLoadedDOM: false,
-  testingEnabled: Services.prefs.getBoolPref("zen.testing.enabled", false),
-  profilingEnabled: Services.prefs.getBoolPref(
+  testingEnabled: getBoolPref("zen.testing.enabled", false),
+  profilingEnabled: getBoolPref(
     "zen.testing.profiling.enabled",
     false
   ),
@@ -51,7 +64,7 @@ window.gZenUIManager = {
         gZenCompactModeManager.getAndApplySidebarWidth.bind(
           gZenCompactModeManager
         ),
-        Services.prefs.getIntPref("zen.view.sidebar-height-throttle", 500)
+        getIntPref("zen.view.sidebar-height-throttle", 500)
       )
     ).observe(gNavToolbox);
 
@@ -154,7 +167,7 @@ window.gZenUIManager = {
     try {
       if (
         !navbarPlacements.length &&
-        !Services.prefs.getBoolPref(kPref, false)
+        !getBoolPref(kPref, false)
       ) {
         CustomizableUI.addWidgetToArea(
           "zen-toggle-compact-mode",
@@ -168,7 +181,7 @@ window.gZenUIManager = {
     } catch (e) {
       console.error("Error adding compact mode button to sidebar:", e);
     }
-    Services.prefs.setBoolPref(kPref, true);
+    setBoolPref(kPref, true);
   },
 
   _initBookmarkCollapseListener() {
@@ -201,7 +214,7 @@ window.gZenUIManager = {
   },
 
   _debloatContextMenus() {
-    if (!Services.prefs.getBoolPref("zen.view.context-menu.refresh", false)) {
+    if (!getBoolPref("zen.view.context-menu.refresh", false)) {
       return;
     }
     const contextMenusToClean = [
@@ -300,13 +313,14 @@ window.gZenUIManager = {
   },
 
   openAndChangeToTab(url, options) {
+    // Gecko addTrustedTab; Chromium: chrome.tabs.create — see tabs adapter.
     if (window.parent) {
       const tab = window.parent.gBrowser.addTrustedTab(url, options);
       window.parent.gBrowser.selectedTab = tab;
       return tab;
     }
     const tab = window.gBrowser.addTrustedTab(url, options);
-    window.gBrowser.selectedTab = tab;
+    setSelectedTab(tab);
     return tab;
   },
 
@@ -361,7 +375,7 @@ window.gZenUIManager = {
   onPopupShowing(showEvent) {
     if (
       AppConstants.platform === "macosx" &&
-      Services.prefs.getBoolPref("widget.macos.native-context-menus", false)
+      getBoolPref("widget.macos.native-context-menus", false)
     ) {
       this._constrainNativePopoverHeight(showEvent.target);
     }
@@ -577,7 +591,7 @@ window.gZenUIManager = {
     }
 
     // Store the current tab
-    this._lastTab = gBrowser.selectedTab;
+    this._lastTab = getSelectedTab();
     if (!this._lastTab) {
       console.warn("No selected tab found when creating new tab");
       return false;
@@ -660,7 +674,7 @@ window.gZenUIManager = {
           !this._lastTab.closing &&
           this._lastTab.documentGlobal &&
           !this._lastTab.documentGlobal.closed &&
-          gBrowser.selectedTab === this._lastTab
+          getSelectedTab() === this._lastTab
         ) {
           this._lastTab._visuallySelected = true;
           this._lastTab = null;
@@ -719,7 +733,7 @@ window.gZenUIManager = {
           }
 
           // Ensure tab and browser are valid before updating state
-          const selectedTab = gBrowser.selectedTab;
+          const selectedTab = getSelectedTab();
           if (
             selectedTab &&
             selectedTab.linkedBrowser &&
@@ -761,7 +775,7 @@ window.gZenUIManager = {
   // Section: Notification messages
   _createToastElement(messageId, options) {
     const createButton = () => {
-      const button = document.createXULElement("button");
+      const button = createXULElementLocal("button");
       button.id = options.button.id;
       button.classList.add("footer-button");
       button.classList.add("primary");
@@ -785,13 +799,13 @@ window.gZenUIManager = {
         return [child, true];
       }
     }
-    const wrapper = document.createXULElement("hbox");
-    const element = document.createXULElement("vbox");
-    const label = document.createXULElement("label");
+    const wrapper = createXULElementLocal("hbox");
+    const element = createXULElementLocal("vbox");
+    const label = createXULElementLocal("label");
     document.l10n.setAttributes(label, messageId, options.l10nArgs);
     element.appendChild(label);
     if (options.descriptionId) {
-      const description = document.createXULElement("label");
+      const description = createXULElementLocal("label");
       description.classList.add("description");
       document.l10n.setAttributes(description, options.descriptionId, options);
       element.appendChild(description);
@@ -812,7 +826,7 @@ window.gZenUIManager = {
     this._toastContainer.removeAttribute("hidden");
     this._toastContainer.appendChild(toast);
     const timeoutFunction = () => {
-      if (Services.prefs.getBoolPref("ui.popup.disable_autohide")) {
+      if (getBoolPref("ui.popup.disable_autohide")) {
         return;
       }
       this.motion
@@ -938,12 +952,12 @@ window.gZenUIManager = {
 
   getOpenUILinkWhere(url, browser, openUILinkWhere) {
     try {
-      let tab = gBrowser.getTabForBrowser(browser);
+      let tab = getTabForBrowser(browser);
       if (
         openUILinkWhere === "current" &&
         !this.urlStringsDomainMatch(url, browser.currentURI.spec) &&
         tab.pinned &&
-        Services.prefs.getBoolPref("zen.tabs.open-pinned-in-new-tab")
+        getBoolPref("zen.tabs.open-pinned-in-new-tab")
       ) {
         return "tab";
       }
@@ -983,7 +997,7 @@ window.gZenVerticalTabsManager = {
       return !(
         window.AppConstants.platform === "macosx" ||
         window.matchMedia("(-moz-gtk-csd-reversed-placement)").matches ||
-        Services.prefs.getBoolPref(
+        getBoolPref(
           "zen.view.experimental-force-window-controls-left"
         )
       );
@@ -1042,9 +1056,9 @@ window.gZenVerticalTabsManager = {
   },
 
   toggleExpand() {
-    const newVal = !Services.prefs.getBoolPref("zen.view.sidebar-expanded");
-    Services.prefs.setBoolPref("zen.view.sidebar-expanded", newVal);
-    Services.prefs.setBoolPref("zen.view.use-single-toolbar", false);
+    const newVal = !getBoolPref("zen.view.sidebar-expanded");
+    setBoolPref("zen.view.sidebar-expanded", newVal);
+    setBoolPref("zen.view.use-single-toolbar", false);
   },
 
   get navigatorToolbox() {
@@ -1053,10 +1067,10 @@ window.gZenVerticalTabsManager = {
 
   initRightSideOrderContextMenu() {
     const kConfigKey = "zen.tabs.vertical.right-side";
-    const fragment = window.MozXULElement.parseXULToFragment(`
+    const fragment = parseXULFragment(`
       <menuitem id="zen-toolbar-context-tabs-right"
                 type="checkbox"
-                ${Services.prefs.getBoolPref(kConfigKey) ? 'checked="true"' : ""}
+                ${getBoolPref(kConfigKey) ? 'checked="true"' : ""}
                 data-lazy-l10n-id="zen-toolbar-context-tabs-right"
                 command="cmd_zenToggleTabsOnRight"
         />
@@ -1478,7 +1492,7 @@ window.gZenVerticalTabsManager = {
         topButtons.prepend(windowButtons);
       }
 
-      const canHideTabBarPref = Services.prefs.getBoolPref(
+      const canHideTabBarPref = getBoolPref(
         "zen.view.compact.hide-tabbar"
       );
       const captionsShouldStayOnSidebar =
@@ -1542,7 +1556,7 @@ window.gZenVerticalTabsManager = {
 
       if (
         this._hasSetSingleToolbar &&
-        Services.prefs.getBoolPref("zen.view.overflow-webext-toolbar", true)
+        getBoolPref("zen.view.overflow-webext-toolbar", true)
       ) {
         topButtons.setAttribute(
           "addon-webext-overflowtarget",
@@ -1591,7 +1605,7 @@ window.gZenVerticalTabsManager = {
   },
 
   _updateMaxWidth() {
-    const maxWidth = Services.prefs.getIntPref(
+    const maxWidth = getIntPref(
       "zen.view.sidebar-expanded.max-width"
     );
     const toolbox = gNavToolbox;
@@ -1611,8 +1625,8 @@ window.gZenVerticalTabsManager = {
   },
 
   toggleTabsOnRight() {
-    const newVal = !Services.prefs.getBoolPref("zen.tabs.vertical.right-side");
-    Services.prefs.setBoolPref("zen.tabs.vertical.right-side", newVal);
+    const newVal = !getBoolPref("zen.tabs.vertical.right-side");
+    setBoolPref("zen.tabs.vertical.right-side", newVal);
   },
 
   appendCustomizableItem(target, child, placements = []) {
@@ -1626,7 +1640,7 @@ window.gZenVerticalTabsManager = {
         return;
       } else if (
         child.hasAttribute("data-extensionid") &&
-        Services.prefs.getBoolPref("zen.view.overflow-webext-toolbar", true)
+        getBoolPref("zen.view.overflow-webext-toolbar", true)
       ) {
         if (gURLBar._isOverflowingItems) {
           const overflowElements = document.getElementById(
@@ -1711,8 +1725,8 @@ window.gZenVerticalTabsManager = {
     const isTab = !!target.closest(".tabbrowser-tab");
     if (
       this._tabEdited ||
-      ((!Services.prefs.getBoolPref("zen.tabs.rename-tabs") ||
-        (Services.prefs.getBoolPref("browser.tabs.closeTabByDblclick") &&
+      ((!getBoolPref("zen.tabs.rename-tabs") ||
+        (getBoolPref("browser.tabs.closeTabByDblclick") &&
           event.type === "dblclick")) &&
         isTab) ||
       !gZenVerticalTabsManager._prefsSidebarExpanded
@@ -1746,7 +1760,7 @@ window.gZenVerticalTabsManager = {
     label.classList.add("tab-label-container-editing");
 
     if (isTab) {
-      const container = window.MozXULElement.parseXULToFragment(`
+      const container = parseXULFragment(`
         <vbox class="tab-label-container tab-editor-container" flex="1" align="start" pack="center"></vbox>
       `);
       label.after(container);

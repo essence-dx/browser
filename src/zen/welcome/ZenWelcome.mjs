@@ -2,6 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import { parseXULFragment } from "../adapters/xul.mjs";
+import { getSelectedTab } from "../adapters/tabs.mjs";
+// Gecko now (gBrowser/PlacesUtils/TabStateCache/MigrationUtils below);
+// Chromium: chrome.tabs/create, chrome.history, chrome.storage.session,
+// chrome.i18n — wire when surfer.json migration.engine === "chromium".
+
 {
   let lazy = {};
 
@@ -49,7 +55,8 @@
   }
 
   function parseXUL(xul) {
-    return window.MozXULElement.parseXULToFragment(xul);
+    return parseXULFragment(xul);
+    // Chromium: template.innerHTML parse (handled in adapters/xul.mjs).
   }
 
   function initializeZenWelcome() {
@@ -58,6 +65,7 @@
       <html:video id="zen-welcome-video" autoplay="" loop="" muted=""
                     disablepictureinpicture="" tabindex="-1"
                     src="chrome://browser/content/zen-videos/welcome-background.mp4"></html:video>
+      <!-- Chromium: chrome.runtime.getURL("zen-videos/welcome-background.mp4") -->
       <html:div id="zen-welcome">
         <html:div id="zen-welcome-start">
           <html:h1 id="zen-welcome-title"></html:h1>
@@ -77,6 +85,7 @@
     document.getElementById("browser").appendChild(parseXUL(XUL));
     const video = document.getElementById("zen-welcome-video");
     video.play().catch(() => {});
+    // Gecko FTL loader; Chromium: chrome.i18n messages.
     window.MozXULElement.insertFTLIfNeeded("browser/zen-welcome.ftl");
   }
 
@@ -329,8 +338,8 @@
     async #applyChoices() {
       await this.#pinEssentials();
       let tabsToGroup = [];
-      if (!gBrowser.selectedTab.hasAttribute("zen-empty-tab")) {
-        tabsToGroup.push(gBrowser.selectedTab);
+      if (!getSelectedTab().hasAttribute("zen-empty-tab")) {
+        tabsToGroup.push(getSelectedTab());
       }
       gZenFolders.createFolder(tabsToGroup, {
         renameFolder: false,

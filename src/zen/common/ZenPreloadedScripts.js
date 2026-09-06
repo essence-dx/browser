@@ -2,6 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+// Migration note (Lane 2): chrome:// + resource:// URLs below are Gecko module
+// paths; Chromium loads the same UI modules as extension pages/scripts via
+// chrome.runtime.getURL / import — see src/zen/adapters/*.mjs import targets.
 // prettier-ignore
 // eslint-disable-next-line no-lone-blocks
 {

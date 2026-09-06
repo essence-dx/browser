@@ -2,7 +2,20 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { nsZenMultiWindowFeature } from "chrome://browser/content/zen-components/ZenCommonUtils.mjs";
+import { nsZenMultiWindowFeature } from "../common/modules/ZenCommonUtils.mjs";
+import {
+  getBoolPref,
+  getIntPref,
+  setIntPref,
+} from "../adapters/prefs.mjs";
+import { createXULElementLocal } from "../adapters/xul.mjs";
+
+function clearPref(key) {
+  try {
+    Services.prefs.clearUserPref(key);
+  } catch {}
+  // Chromium: chrome.storage.local.remove(key);
+}
 
 const KEYCODE_MAP = {
   F1: "VK_F1",
@@ -448,7 +461,13 @@ class KeyShortcut {
   }
 
   toXHTMLElement(aWindow) {
-    let key = aWindow.document.createXULElement("key");
+    let key;
+    if (typeof aWindow.document.createXULElement === "function") {
+      key = aWindow.document.createXULElement("key");
+    } else {
+      key = createXULElementLocal("key");
+    }
+    // Chromium: document.createElement("key");
     return this.replaceWithChild(key);
   }
 
@@ -706,7 +725,7 @@ class nsZenKeyboardShortcutsLoader {
       return await IOUtils.readJSON(this.shortcutsFile);
     } catch (e) {
       // Recreate shortcuts file
-      Services.prefs.clearUserPref("zen.keyboard.shortcuts.version");
+      clearPref("zen.keyboard.shortcuts.version");
       console.warn("Error loading shortcuts file", e);
       return null;
     }
@@ -899,11 +918,11 @@ class nsZenKeyboardShortcutsVersioner {
   constructor() {}
 
   get version() {
-    return Services.prefs.getIntPref("zen.keyboard.shortcuts.version", 0);
+    return getIntPref("zen.keyboard.shortcuts.version", 0);
   }
 
   set version(version) {
-    Services.prefs.setIntPref("zen.keyboard.shortcuts.version", version);
+    setIntPref("zen.keyboard.shortcuts.version", version);
   }
 
   getVersionedData(data) {
@@ -1338,7 +1357,7 @@ window.gZenKeyboardShortcutsManager = {
     //  handled wont wait for the async function to finish.
     void this.getZenKeyset();
 
-    this._hasCleared = Services.prefs.getBoolPref(
+    this._hasCleared = getBoolPref(
       "zen.keyboard.shortcuts.disable-mainkeyset-clear",
       false
     );
@@ -1366,6 +1385,7 @@ window.gZenKeyboardShortcutsManager = {
   },
 
   get inBrowserView() {
+    // Gecko: chrome://browser/content/browser.xhtml; Chromium: main window URL.
     return window.location.href == "chrome://browser/content/browser.xhtml";
   },
 
@@ -1389,6 +1409,7 @@ window.gZenKeyboardShortcutsManager = {
             label: { "l10n-id": "zen-shortcuts-corrupted" },
             image:
               "chrome://browser/skin/notification-icons/persistent-storage-blocked.svg",
+              // Chromium: chrome.runtime.getURL(...) asset.
             priority: gNotificationBox.PRIORITY_WARNING_HIGH,
           },
           []
@@ -1425,7 +1446,8 @@ window.gZenKeyboardShortcutsManager = {
         return existingKeyset;
       }
 
-      this._zenDevtoolsKeyset = document.createXULElement("keyset");
+      this._zenDevtoolsKeyset = createXULElementLocal("keyset");
+      // Chromium: document.createElement("keyset");
       this._zenDevtoolsKeyset.id = id;
 
       const mainKeyset = document.getElementById(ZEN_DEVTOOLS_KEYSET_ID);
@@ -1531,7 +1553,7 @@ window.gZenKeyboardShortcutsManager = {
 
   async resetAllShortcuts() {
     await this.loader.remove();
-    Services.prefs.clearUserPref("zen.keyboard.shortcuts.version");
+    clearPref("zen.keyboard.shortcuts.version");
   },
 
   async _saveShortcuts() {

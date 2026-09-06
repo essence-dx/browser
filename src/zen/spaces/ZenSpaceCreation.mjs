@@ -2,13 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+import { getIntPref } from "../adapters/prefs.mjs";
+// Gecko now (MozXULElement base + tab-strip cache below); Chromium:
+// HTMLElement base, no cache invalidation — see adapters/xul.mjs.
+
 const lazy = {};
 
 ChromeUtils.defineLazyGetter(lazy, "l10n", () => {
   return new Localization(["browser/zen-workspaces.ftl"], true);
 });
 
-class nsZenWorkspaceCreation extends MozXULElement {
+class nsZenWorkspaceCreation extends (window.MozXULElement ?? HTMLElement) {
   #wasInCollapsedMode = false;
   #urlbarDimmed = false;
 
@@ -92,7 +96,7 @@ class nsZenWorkspaceCreation extends MozXULElement {
 
   get #spaceSwitchDuration() {
     return (
-      Services.prefs.getIntPref("zen.workspaces.switch-animation-duration") /
+      getIntPref("zen.workspaces.switch-animation-duration") /
       1000
     );
   }
@@ -283,6 +287,7 @@ class nsZenWorkspaceCreation extends MozXULElement {
     gZenWorkspaces._organizeWorkspaceStripLocations(workspace, true);
     gZenWorkspaces.updateTabsContainers();
 
+    // Gecko tab-strip cache; Chromium: no-op (tab list re-queried).
     gBrowser.tabContainer._invalidateCachedTabs();
   }
 

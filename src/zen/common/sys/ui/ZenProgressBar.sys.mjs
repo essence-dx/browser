@@ -2,7 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { ZenUIComponent } from "resource:///modules/zen/ui/ZenUIComponent.sys.mjs";
+import { ZenUIComponent } from "./ZenUIComponent.sys.mjs";
+import { createXULElementLocal } from "../../../adapters/xul.mjs";
+// Gecko now (gBrowser progress below); Chromium: chrome.tabs.onUpdated —
+// wire when surfer.json migration.engine === "chromium".
 
 const WAIT_BEFORE_SHOWING_LONG_LOAD = 3000;
 
@@ -36,7 +39,8 @@ export class ZenProgressBar extends ZenUIComponent {
       return null;
     }
     if (!this.#element) {
-      this.#element = this.window.document.createXULElement("hbox");
+      this.#element = createXULElementLocal("hbox");
+      // Chromium: document.createElement("hbox").
       this.#element.id = "zen-loading-progress-bar";
     }
     if (

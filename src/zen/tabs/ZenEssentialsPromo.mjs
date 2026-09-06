@@ -2,6 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+import { createXULElementLocal } from "../adapters/xul.mjs";
+// Gecko: MozXULElement base + createXULElement; Chromium: HTMLElement base +
+// document.createElement (see adapters/xul.mjs).
+
 const TAG_NAME = "zen-essentials-promo";
 
 // Even though its costly, we need to update the pinned height
@@ -10,7 +14,7 @@ function updatePinnedHeight() {
   gZenWorkspaces.updateTabsContainers();
 }
 
-class nsZenEssentialsPromo extends MozXULElement {
+class nsZenEssentialsPromo extends (window.MozXULElement ?? HTMLElement) {
   #hasConnected = false;
 
   static markup = `
@@ -58,7 +62,8 @@ export function createZenEssentialsPromo(container = undefined) {
   if (section.children.length) {
     return false;
   }
-  const element = document.createXULElement(TAG_NAME);
+  const element = createXULElementLocal(TAG_NAME);
+  // Chromium: document.createElement(TAG_NAME).
   section.appendChild(element);
   section.essentialsPromo = element;
   // Trigger re-calculation of pinned height to avoid any flickering
