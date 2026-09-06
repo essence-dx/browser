@@ -1,47 +1,50 @@
-# PLAN — Zen Firefox → Chromium: Main Task (3 Lanes, Hours)
+# PLAN — Zen Firefox → Chromium: 100% Complete (3 Lanes, Main Task)
 
-**Branch:** `chromium-migration` from `dev@8df45e5` (FF 155.0.1) — `G:\Dx\zen` — scaffold `adc0515`+`b197970`
-**Main task:** Migrate real files Firefox Gecko → Chromium. **Hours, not weeks — no tests, no merges.**
-**Scope:** 176 app files / ~50k lines + 258 patches / 13k lines (808 tests ignored).
+**Branch:** `chromium-migration` from `dev@8df45e5` (FF 155.0.1) — `G:\Dx\zen`
+**Main task = 100%:** every Gecko call site swapped + shell boots + flag flips. Hours of file work, no tests, no merges.
+**Status now (~10%):** 1820 API hits + 2056 protocol/CSS hits in `src/zen` (~250 files); 258 patches + XPCOM C++ untouched; `engine-chromium/` empty.
+**Scope:** 176 app files / ~50k lines + 258 patches / 13k lines + 15 IDL/CPP + shell. 808 tests ignored.
 
-## Why 3 Lanes Work in Hours
+## Why 3 Lanes Finish 100%
 
-Zen is Surfer patchset; every file uses `chrome://`/`resource://`+`gBrowser`/`Services`/`MozXULElement` (3418 hits). Scaffold isolated pure logic to `src/zen/shared/` (0 deps) and facaded Gecko behind `src/zen/adapters/` (`prefs`/`tabs`/`session`/`xul` — Gecko now, `chrome.*` stubs next). 50k lines split by directory = 3 agents edit disjoint files directly on `chromium-migration`, no PRs, no weekly merges — just `lane{N}` commits and `npm run lint`.
+Scaffold isolated pure logic (`shared/`, 0 deps) + facaded Gecko (`adapters/`). Remaining work is countable per file (TODO.md lists every file + hit count). 3 agents edit disjoint dirs directly on `chromium-migration` — Lane 1 owns seam + shell + flag, Lane 2 owns UI call sites + CSS, Lane 3 owns services + IDL/CPP + patches. Done is measurable: grep counts hit zero, shell boots, flag = `"chromium"`. Prior lane commits only added imports/comments — 100% requires every call site working.
 
-## Architecture — Main Task Files Only
+## Architecture — 100% Files
 
 ```
-chromium-migration branch (G:\Dx\zen)
-├── surfer.json:migration.engine = "gecko" (now)
-├── src/zen/shared/    ← Lane 1 pure (already done)
-├── src/zen/adapters/  ← Lane 1 single writer — lanes 2–3 import from here
-├── src/zen/{common,kbs,welcome,media,tabs,spaces,split-view,compact-mode,folders,glance} ← Lane 2 UI
-├── src/zen/{boosts,live-folders,sync,urlbar,sessionstore,space-routing,mods,toolkit,drag-and-drop,window-drag} ← Lane 3 services
-├── src/browser/**/*.patch (258) ← Lane 3 catalogs for BUILD.gn later
-└── engine/ (Gecko) stays green; engine-chromium/ (CEF) deferred to final mile
+chromium-migration (G:\Dx\zen)
+├── surfer.json:migration.engine: "gecko" → "chromium" (Lane 1 flips at zero + boot)
+├── src/zen/shared/      ← Lane 1 pure, both engines
+├── src/zen/adapters/    ← Lane 1 single writer; every export dual-working (Gecko + chrome.*)
+├── src/zen/{common,tabs,spaces,split-view,compact-mode,folders,glance,kbs,welcome,media} ← Lane 2: 0 API hits, 0 -moz-/chrome://
+├── src/zen/{boosts,live-folders,sync,urlbar,sessionstore,space-routing,mods,toolkit,drag-and-drop,window-drag,share,downloads} ← Lane 3: 0 API hits
+├── src/browser/**/*.patch (258) + toolkit/dom/layout → BUILD.gn + Views (Lane 3 rewrites)
+├── *.idl/*.cpp/*.h/components.conf → Mojo/chrome.scripting shim or delete (Lanes 1+3)
+├── prefs/*.yaml + configs/ → PrefService/policy (Lane 3)
+└── engine/ (Gecko green) + engine-chromium/ (CEF shell, Lane 1: tab 1 Chromium, tab 2 Gecko)
 ```
-No test rewrites, no GN rewrite yet — just file migration above.
 
-## Lanes — Main Task Only (Hours)
+## Lanes — 100% (Hours of file work)
 
-**Lane 1 — Foundation (Agent 1):** `surfer.json`, `shared/`, `adapters/`, `zen.globals.mjs`. Add `adapters/observers|windows|storage`, keep flag/docs. Single writer.
+**Lane 1 — Foundation + Cutover:** `surfer.json`, `shared/`, `adapters/`, `zen.globals.mjs`, `engine-chromium/`, `moz.build`. Make every adapter export dual-working, scaffold CEF shell + dual-boot, flip flag at zero + boot, strip `Services/gBrowser` from globals.
 
-**Lane 2 — UI Shell (Agent 2):** `common/`/`tabs`/`spaces`/`compact-mode`/`split-view`/`welcome`/`media`/`kbs`/`folders`/`glance`. Swap Gecko → `shared/`+`adapters/` per file.
+**Lane 2 — UI 100%:** `common/`(112)/`tabs/`(42)/`spaces/`(142)/`split-view/`(69)/`compact-mode/`+cpp/`folders/`(60)/`glance/`/`kbs`/`welcome`/`media` + owned CSS (`-moz-`→standard) + XHTML→HTML. Per-file TODO.md checklist, check at 0 hits.
 
-**Lane 3 — Services & Patches (Agent 3):** `boosts`/`live-folders`/`sync`/`urlbar`/`sessionstore`/`space-routing`/`mods`/`toolkit`/`drag-and-drop`/`window-drag`/`src/browser/**.patch`. Migrate data layer, stub XPCOM, catalog patches.
+**Lane 3 — Services + Patches 100%:** `boosts/`/`live-folders`/`sync/`(39)/`urlbar/`(~100)/`sessionstore/`(59)/`space-routing/`(48)/`mods/`/`toolkit`/`drag-and-drop/`(38)/`window-drag/` + IDL/CPP→Mojo + 258 patches→GN + prefs/configs→PrefService.
 
-Each lane commits `chore(migration): lane{N}: <files>` directly to `chromium-migration`. No PRs, no merges needed now.
+Each commits `chore(migration): lane{N}: <file> <before>→0` directly. No PRs/merges.
 
-## Risks (Main Task)
+## Risks (100%)
 
-- **Collision:** one directory = one lane; others never edit your dirs.
-- **Patch debt:** 258 patches logged only — no GN this phase.
-- **No tests:** work-first per order; verification is `npm run lint` + `git status`.
+- **Fake-done (imports without swaps):** 100% = working calls, grep = 0. Comments don't count.
+- **Collision:** one dir = one lane.
+- **Patch/GN + shell:** Lane 3 GN + Lane 1 shell are the long poles — start them now, not after swaps.
+- **No tests:** verification is grep counts + shell boot, per order.
 
-## Verification
+## Verification = 100%
 
-`npm run lint` per lane, `git status` clean. Done when owned files import via `shared/`+`adapters/` — not test coverage.
+`grep Services\.|gBrowser\.|SessionStore\.|PlacesUtils\.|MozXULElement|createXULElement|ChromeUtils\.|XPCOMUtils\. src/zen --exclude-dir=adapters` = 0; `grep chrome://|resource://|-moz-|@namespace|%include` in migrated files = 0; `engine-chromium/` boots; flag = `"chromium"`.
 
 ## Exit
 
-`AGENTS.md` lets each agent start now on its lane. Final mile (`engine-chromium/` CEF, flip engine, retire `engine/`) after lanes' main-task commits land.
+All TODO.md boxes checked + shell boots + flag flips. That is 100% — browser runs on Chromium.
