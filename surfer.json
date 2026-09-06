@@ -53,5 +53,10 @@
     ],
     "licenseType": "MPL-2.0"
   },
-  "updateHostname": "updates.zen-browser.app"
+  "updateHostname": "updates.zen-browser.app",
+  "migration": {
+    "engine": "gecko",
+    "chromiumBranch": "chromium-migration",
+    "strategy": "strangler-fig: isolate pure logic → adapter layer → engine-chromium/ via CEF → shared services → cut over"
+  }
 }
