@@ -1,64 +1,69 @@
-# TODO — Chromium Migration (3 Lanes, Work-First)
+# TODO — Chromium Migration: Main Task (3 Lanes, Hours)
 
-**Branch:** `chromium-migration` from `dev@8df45e5` (FF 155.0.1) — scaffold `adc0515`
-**Scope:** `src/zen` app 176 files / ~50k lines + 258 patches / 13k lines (808 test files excluded — not in scope)
-**Rule:** Tests deprioritized. Do the actual Firefox→Chromium work in 3 parallel lanes; one directory = one lane.
+**Branch:** `chromium-migration` from `dev@8df45e5` (FF 155.0.1) — scaffold `adc0515` + `b197970`
+**Main task:** Migrate real files from Firefox Gecko → Chromium. **No tests, no wasted merges — hours, not weeks.** 3 agents work in parallel on `chromium-migration`, direct commits in owned dirs.
+**Scope:** `src/zen` app 176 files / ~50k lines + 258 patches / 13k lines (808 test files ignored).
 
-## Phase 0 — Done (adc0515)
+## Phase 0 — Done
 
 - [x] Branch `chromium-migration` from `dev@8df45e5`
-- [x] `src/zen/shared/zenColorUtils.mjs` (101L) + `src/zen/shared/zenSplitLayout.mjs` (106L) — pure, 0 Gecko deps
+- [x] `src/zen/shared/zenColorUtils.mjs` + `shared/zenSplitLayout.mjs` — pure, 0 Gecko deps
 - [x] `src/zen/adapters/{prefs,tabs,session,xul}.mjs` — Gecko impl + commented `chrome.*` stubs
-- [x] `surfer.json:migration {engine:"gecko", chromiumBranch:"chromium-migration", strategy:"strangler-fig"}`
-- [x] `docs/chromium-migration.md` technical deep dive
+- [x] `surfer.json:migration {engine:"gecko"}` + `docs/chromium-migration.md`
 
-## Lane 1 — Foundation & Build Seam (Agent 1) — Owns `shared/`/`adapters/`/flag
+## Lane 1 — Foundation (Agent 1) — Main task: `shared/`+`adapters/` only
 
-- [ ] Add `src/zen/adapters/observers.mjs` — `Services.obs` → `chrome.events` shim (Gecko body + stub)
-- [ ] Add `src/zen/adapters/windows.mjs` — `BrowserWindowTracker`/`SessionStore` windows → `chrome.windows` shim
-- [ ] Add `src/zen/adapters/storage.mjs` — `IOUtils`/`PathUtils`/`JSONFile`/`OS.File` → `chrome.storage` shim
-- [ ] Document `surfer.json:migration.engine = "gecko"|"chromium"|"dual"` (`"gecko"` now); reserve `engine-chromium/` (CEF placeholder, not fetched yet)
-- [ ] Keep `docs/chromium-migration.md` current; gate `src/zen/moz.build` has no new `DIRS` yet (deferred)
+You own: `surfer.json`, `src/zen/shared/**`, `src/zen/adapters/**`, `src/zen/zen.globals.mjs`, `docs/chromium-migration.md`
 
-## Lane 2 — UI Shell & Low-Coupling (Agent 2) — Owns `common/`/`tabs/`/`spaces/`/`compact-mode/`/`split-view/`/`welcome/`/`media/`/`kbs/`/`folders/`/`glance/`
+Main task files to migrate (hours):
 
-Work-first, no test rewrites — swap Gecko calls to Lane 1 `shared/`+`adapters/`:
+- [ ] `src/zen/adapters/observers.mjs` — `Services.obs` → `chrome.events` shim (Gecko body + stub)
+- [ ] `src/zen/adapters/windows.mjs` — `BrowserWindowTracker` → `chrome.windows` shim
+- [ ] `src/zen/adapters/storage.mjs` — `IOUtils`/`PathUtils` → `chrome.storage` shim
+- [ ] Keep `shared/` pure; flag `gecko` (no fetch yet). You are single writer — lanes 2–3 import from you.
 
-- [ ] `kbs/ZenKeyboardShortcuts.mjs` → `adapters/prefs` + `adapters/xul`
-- [ ] `welcome/ZenWelcome.mjs` + `media/ZenMediaController.mjs` → `adapters/prefs`/`xul`
-- [ ] `tabs/ZenPinnedTabManager.mjs` → `adapters/tabs`/`session`, `shared/` where applicable
-- [ ] `spaces/ZenSpaceManager.mjs` + `ZenGradientGenerator.mjs` → `shared/zenColorUtils` + `adapters/tabs`/`prefs`/`session`; drop `MozXULElement.parseXULToFragment` → `adapters/xul`
-- [ ] `split-view/ZenViewSplitter.mjs` → `shared/zenSplitLayout` tree (`nsSplitNode`/`applyGridLayoutToPositions`)
-- [ ] `compact-mode/` (`ZenCompactMode.mjs` + `ZenMouseTracker.cpp` later → `IntersectionObserver` shim) + `folders/` + `glance/` similarly
+## Lane 2 — UI Shell (Agent 2) — Main task: UI files
 
-**Lane 2 does NOT touch:** `boosts/`, `live-folders/`, `sync/`, `urlbar/`, `sessionstore/`, `space-routing/`, `mods/`, `toolkit/`, `drag-and-drop/`, `window-drag/`.
+You own: `src/zen/common/**`, `src/zen/tabs/**`, `src/zen/spaces/**`, `src/zen/compact-mode/**`, `src/zen/split-view/**`, `src/zen/welcome/**`, `src/zen/media/**`, `src/zen/kbs/**`, `src/zen/folders/**`, `src/zen/glance/**`
 
-## Lane 3 — Services, Data & Engine Patches (Agent 3) — Owns `boosts/`/`live-folders/`/`sync/`/`urlbar/`/`sessionstore/`/`space-routing/`/`mods/`/`toolkit/`/`drag-and-drop/`/`window-drag/`/`share/`/`src/browser/`+`external-patches`
+Main task files to migrate (hours) — swap Gecko (`Services.prefs`/`MozXULElement`/`chrome://`/`gBrowser`) → `shared/`+`adapters/`:
 
-Work-first — migrate services/data + catalog patch surface:
+- [ ] `src/zen/kbs/ZenKeyboardShortcuts.mjs`
+- [ ] `src/zen/welcome/ZenWelcome.mjs` + `src/zen/media/ZenMediaController.mjs`
+- [ ] `src/zen/tabs/ZenPinnedTabManager.mjs`
+- [ ] `src/zen/spaces/ZenSpaceManager.mjs` + `ZenGradientGenerator.mjs` → `shared/zenColorUtils`
+- [ ] `src/zen/split-view/ZenViewSplitter.mjs` → `shared/zenSplitLayout`
+- [ ] `src/zen/compact-mode/` + `src/zen/folders/` + `src/zen/glance/` (drop XUL, keep layout/CSS)
 
-- [ ] `boosts/` + `live-folders/` → `adapters/storage`/`session`/`prefs`; keep polling logic
-- [ ] `sync/` (Weave) → `chrome.storage.sync` + `chrome.identity` shims via `adapters/session`/`storage`
-- [ ] `urlbar/` (`ZenUB*Provider.sys.mjs`) → Chromium `omnibox` shim via `adapters/`
-- [ ] `sessionstore/` (`ZenSessionManager.sys.mjs`) → `chrome.sessions` shim
-- [ ] `mods/` native `nsZenModsBackend`/`ZenStyleSheetCache.cpp` → `chrome.scripting.insertCSS` shim
-- [ ] `drag-and-drop`/`window-drag` XPCOM (`nsIZenDragAndDrop`, `nsZenWindowDragUtils`) → Mojo stubs
-- [ ] Catalog `src/browser/**/*.patch` + `src/toolkit/**/*.patch` + `src/dom/**` + `src/layout/**` for `BUILD.gn`/Views rewrite — log only this phase, actual GN rewrite Phase 4
-- [ ] Housekeep `AGENTS.md`/`TODO.md`/`PLAN.md`/`CHANGELOG.md` so Lanes 1–2 never collide on docs
+Do NOT touch: `boosts/`, `live-folders/`, `sync/`, `urlbar/`, `sessionstore/`, `space-routing/`, `mods/`, `toolkit/`, `drag-and-drop/`, `window-drag/`.
 
-**Lane 3 does NOT touch:** `shared/`/`adapters/` internals, nor Lane 2 UI modules.
+## Lane 3 — Services & Patches (Agent 3) — Main task: data/services + patch catalog
 
-## Module Inventory (Lane-Assigned)
+You own: `src/zen/boosts/**`, `src/zen/live-folders/**`, `src/zen/sync/**`, `src/zen/urlbar/**`, `src/zen/sessionstore/**`, `src/zen/space-routing/**`, `src/zen/mods/**`, `src/zen/toolkit/**`, `src/zen/drag-and-drop/**`, `src/zen/window-drag/**`, `src/zen/share/**`, `src/browser/**`, `src/external-patches/**`, `prefs/**`
+
+Main task files to migrate (hours):
+
+- [ ] `src/zen/boosts/**` + `src/zen/live-folders/**` → `adapters/storage`/`session`/`prefs`
+- [ ] `src/zen/sync/**` (Weave → `chrome.storage.sync`+`identity` shims)
+- [ ] `src/zen/urlbar/**` (`UrlbarProvider` → `omnibox`)
+- [ ] `src/zen/sessionstore/**` → `chrome.sessions`
+- [ ] `src/zen/mods/**` native → `chrome.scripting`
+- [ ] `src/zen/drag-and-drop/**` + `src/zen/window-drag/**` XPCOM → stubs
+- [ ] Catalog `src/browser/**/*.patch` (258, 13,582 lines) for `BUILD.gn`/Views rewrite — log only, no GN yes
+
+Do NOT touch: `shared/`/`adapters/` internals, nor Lane 2 UI modules.
+
+## Module Inventory (Main task, lane-assigned)
 
 | Lane | Module | Files | Lines | Effort |
 |------|--------|-------|-------|--------|
-| 1 | `shared` + `adapters` | 6 + stubs | ~800 | S |
+| 1 | `shared` + `adapters` | 6 +3 stubs | ~800 | S |
 | 2 | `common` | 43 | 6,986 | M |
 | 2 | `tabs` | 8 | 2,527 | M |
 | 2 | `spaces` | 13 | 7,250 | L |
 | 2 | `compact-mode` | 15 | 1,910 | M |
 | 2 | `split-view` | 5 | 2,810 | M |
-| 2 | `welcome` | 4 | 120k* | S (mostly mp4) |
+| 2 | `welcome` | 4 | 120k* | S |
 | 2 | `media` | 4 | 1,085 | S |
 | 2 | `kbs` | 2 | 1,496 | S |
 | 2 | `folders` | 4 | 2,435 | M |
@@ -74,17 +79,9 @@ Work-first — migrate services/data + catalog patch surface:
 | 3 | `drag-and-drop` | 8 | 1,947 | M |
 | 3 | `window-drag` | 7 | 496 | S |
 | 3 | `share` | 2 | 150 | S |
-| 3 | `src/browser` patches | 258 | 13,582 | L (catalog) |
+| 3 | `src/browser` patches | 258 | 13,582 | L |
 | — | `tests` | 808 | — | out of scope |
 
-## Final Mile (After Lanes Converge)
+## Done (Hours)
 
-- [ ] Shell + CEF: `engine-chromium/` via CEF/WebView2 alongside `engine/`; shell owns tab strip, guests are `BrowserView` surfaces (dual: tab 1=CEF, tab 2=Gecko)
-- [ ] Shared services multiplex: cookies/history/downloads/permissions/context menus
-- [ ] Flip `surfer.json:migration.engine` default → `"chromium"`; keep Gecko as fallback `dual`
-- [ ] Retire `engine/`, Surfer Gecko fetcher, `moz.build` shims — delete Gecko path
-
-## Verification (Work-First)
-
-- `npm run lint` passes per lane. No test gate until cutover; `src/zen/tests/` stays Gecko path.
-- `git log --oneline` shows `chore(migration): lane{N}:` per lane; `git merge dev` weekly by Lane 1 first.
+Each lane commits `chore(migration): lane{N}: <files>` directly to `chromium-migration`. No merges needed. Done when owned files import via `shared/`+`adapters/` and `npm run lint` passes. Final mile `engine-chromium/` + cutover deferred — main task is file migration above.
