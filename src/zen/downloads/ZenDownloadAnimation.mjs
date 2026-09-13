@@ -6,6 +6,8 @@ import {
   nsZenDOMOperatedFeature,
   nsZenMultiWindowFeature,
 } from "chrome://browser/content/zen-components/ZenCommonUtils.mjs";
+import { getBoolPrefSync, getIntPrefSync } from "../adapters/prefs.mjs";
+import { parseXULFragment } from "../adapters/xul.mjs";
 
 const CONFIG = Object.freeze({
   ANIMATION: {
@@ -37,7 +39,7 @@ class nsZenDownloadAnimation extends nsZenDOMOperatedFeature {
 
   #handleNewDownload() {
     if (
-      !Services.prefs.getBoolPref("zen.downloads.download-animation") ||
+      !getBoolPrefSync("zen.downloads.download-animation") ||
       !nsZenMultiWindowFeature.isActiveWindow
     ) {
       return;
@@ -134,7 +136,7 @@ class nsZenDownloadAnimationElement extends HTMLElement {
   }
 
   #areTabsOnRightSide() {
-    const position = Services.prefs.getIntPref(
+    const position = getIntPrefSync(
       "zen.downloads.icon-popup-position",
       0
     );
@@ -144,7 +146,7 @@ class nsZenDownloadAnimationElement extends HTMLElement {
     if (position === 2) {
       return true;
     }
-    return Services.prefs.getBoolPref("zen.tabs.vertical.right-side");
+    return getBoolPrefSync("zen.tabs.vertical.right-side");
   }
 
   #determineEndPosition() {
@@ -187,7 +189,7 @@ class nsZenDownloadAnimationElement extends HTMLElement {
             </box>
           `;
 
-    const fragment = window.MozXULElement.parseXULToFragment(arcAnimationHTML);
+    const fragment = parseXULFragment(arcAnimationHTML);
     const animationElement = fragment.querySelector(
       ".zen-download-arc-animation"
     );
@@ -250,7 +252,7 @@ class nsZenDownloadAnimationElement extends HTMLElement {
 
       await gZenUIManager.motion.animate(arcAnimationElement, sequence, {
         duration:
-          Services.prefs.getIntPref(
+          getIntPrefSync(
             "zen.downloads.download-animation-duration"
           ) / 1000,
         easing: "cubic-bezier(0.37, 0, 0.63, 1)",
@@ -385,7 +387,7 @@ class nsZenDownloadAnimationElement extends HTMLElement {
       const sideProp = areTabsPositionedRight ? "right" : "left";
 
       const fragment =
-        window.MozXULElement.parseXULToFragment(boxAnimationHTML);
+        parseXULFragment(boxAnimationHTML);
       this.#boxAnimationElement = fragment.querySelector(
         ".zen-download-box-animation"
       );
@@ -440,7 +442,7 @@ class nsZenDownloadAnimationElement extends HTMLElement {
 
   #getBoxAnimationDurationMs() {
     return (
-      Services.prefs.getIntPref("zen.downloads.download-animation-duration") +
+      getIntPrefSync("zen.downloads.download-animation-duration") +
       200
     );
   }

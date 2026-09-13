@@ -3,9 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-@import url("chrome://browser/content/zen-styles/zen-panels/bookmarks.css");
-@import url("chrome://browser/content/zen-styles/zen-panels/print.css");
-@import url("chrome://browser/content/zen-styles/zen-panels/dialog.css");
+@import url("zen-panels/bookmarks.css");
+@import url("zen-panels/print.css");
+@import url("zen-panels/dialog.css");
+/* Chromium: relative imports (were chrome://...). */
 
 :root {
   --arrowpanel-menuitem-border-radius: 5px;
@@ -38,10 +39,12 @@ panel {
   --panel-box-shadow-margin: 8px;
 
   /* This should match GetMenuCornerRadius() on macOS, or be overridden below */
-  @media (-moz-platform: macos) {
+  /* was @media (-moz-platform: macos) — gate macOS via [data-platform="macos"]. */
+  @media all {
     --panel-border-radius: 10px;
 
-    @media (-moz-mac-tahoe-theme) {
+    /* was @media (-moz-mac-tahoe-theme) — macOS Tahoe only. */
+    @media all {
       --panel-border-radius: 12px;
     }
   }
@@ -327,10 +330,7 @@ menuseparator {
 
     --zen-toast-padding: 6px;
     --zen-toast-max-height: 42px;
-    @media (-moz-platform: macos) {
-      --zen-toast-padding: 8px;
-      --zen-toast-max-height: 48px;
-    }
+    /* was @media (-moz-platform: macos) — gate macOS via [data-platform="macos"]. */
 
     gap: 8px;
     z-index: 1000;

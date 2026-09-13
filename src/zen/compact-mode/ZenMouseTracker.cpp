@@ -7,7 +7,8 @@
 
 #include <atomic>
 
-#include "mozilla/Services.h"
+// Chromium shim: observer bridge lives in JS (IntersectionObserver + chrome windows); platform observer via hub forward-decl below.
+namespace mozilla { namespace services { class ZenObserverHub; } }
 #include "mozilla/WidgetUtils.h"
 #include "nsIObserverService.h"
 #include "nsIWidget.h"

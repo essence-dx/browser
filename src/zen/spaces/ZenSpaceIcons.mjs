@@ -2,11 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { createXULElementLocal } from "../adapters/xul.mjs";
-// Gecko now (MozXULElement base + XUL toolbarbutton/label); Chromium:
-// HTMLElement + HTML button/label — see adapters/xul.mjs.
+import { makeXulElement, getElementBase } from "../adapters/xul.mjs";
+import { playHapticFeedback } from "../adapters/prefs.mjs";
+// Dual-engine base + toolbarbutton/label via the XUL adapter —
+// HTMLElement + HTML button/label on Chromium (see adapters/xul.mjs).
 
-class nsZenWorkspaceIcons extends (window.MozXULElement ?? HTMLElement) {
+class nsZenWorkspaceIcons extends getElementBase() {
   #hasConnected = false;
 
   connectedCallback() {
@@ -80,8 +81,8 @@ class nsZenWorkspaceIcons extends (window.MozXULElement ?? HTMLElement) {
               }
               if (nextSibling !== draggedTab.nextSibling) {
                 /* eslint-disable mozilla/valid-services */
-                // Gecko haptic API; Chromium: navigator.vibrate.
-                Services.zen.playHapticFeedback();
+                // Haptic tick via prefs adapter; Chromium uses navigator.vibrate.
+                playHapticFeedback();
               }
             }
           }
@@ -109,12 +110,12 @@ class nsZenWorkspaceIcons extends (window.MozXULElement ?? HTMLElement) {
   }
 
   #createWorkspaceIcon(workspace) {
-    const button = createXULElementLocal("toolbarbutton");
+    const button = makeXulElement("toolbarbutton");
     button.setAttribute("class", "subviewbutton toolbarbutton-1");
     button.setAttribute("tooltiptext", workspace.name);
     button.setAttribute("zen-workspace-id", workspace.uuid);
     button.setAttribute("context", "zenWorkspaceMoreActions");
-    const icon = createXULElementLocal("label");
+    const icon = makeXulElement("label");
     icon.setAttribute("class", "zen-workspace-icon");
     const isSvgIcon = workspace.icon && workspace.icon.endsWith(".svg");
     if (gZenWorkspaces.workspaceHasIcon(workspace)) {

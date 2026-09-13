@@ -2,9 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { getBoolPref } from "../../adapters/prefs.mjs";
-import { getSelectedTab } from "../../adapters/tabs.mjs";
-// Gecko now (gBrowser selectedTab below); Chromium: chrome.tabs.query —
+import { getBoolPrefSync, getAppInfo } from "../../adapters/prefs.mjs";
+import { getSelectedTabSync } from "../../adapters/tabs.mjs";
+import { getAllWindows } from "../../adapters/windows.mjs";
+// Gecko now (tab strip selection below); Chromium: chrome.tabs.query —
 // same tabs-adapter surface.
 
 window.gZenOperatingSystemCommonUtils = {
@@ -15,7 +16,7 @@ window.gZenOperatingSystemCommonUtils = {
   },
 
   get currentOperatingSystem() {
-    let os = Services.appinfo.OS;
+    let os = getAppInfo().OS;
     return this.kZenOSToSmallName[os];
   },
 };
@@ -23,12 +24,17 @@ window.gZenOperatingSystemCommonUtils = {
 export class nsZenMultiWindowFeature {
   constructor() {}
 
+  // Sync snapshot for `for...of` loops; refreshed by the async iterators
+  // below via adapters/windows.mjs (window mediator on Gecko, chrome.windows
+  // on Chromium). Falls back to this window before the first refresh.
+  static #knownWindows = null;
+
   static get browsers() {
-    return Services.wm.getEnumerator("navigator:browser");
+    return nsZenMultiWindowFeature.#knownWindows ?? [window];
   }
 
   static get currentBrowser() {
-    return Services.wm.getMostRecentWindow("navigator:browser");
+    return window;
   }
 
   static get isActiveWindow() {
@@ -47,7 +53,14 @@ export class nsZenMultiWindowFeature {
   }
 
   async forEachWindow(callback) {
-    for (const browser of nsZenMultiWindowFeature.browsers) {
+    let wins;
+    try {
+      wins = await getAllWindows();
+    } catch {
+      wins = [window];
+    }
+    nsZenMultiWindowFeature.#knownWindows = wins;
+    for (const browser of wins) {
       try {
         if (browser.closed) {
           continue;
@@ -96,7 +109,7 @@ window.gZenCommonActions = {
 
     try {
       if (
-        getBoolPref("browser.urlbar.decodeURLsOnCopy", false) &&
+        getBoolPrefSync("browser.urlbar.decodeURLsOnCopy", false) &&
         !currentUrl.schemeIs("data")
       ) {
         displaySpec = decodeURI(displaySpec);
@@ -106,22 +119,16 @@ window.gZenCommonActions = {
     ClipboardHelper.copyString(displaySpec);
 
     let button;
-    /* eslint-disable mozilla/valid-services */
-    if (Services.zen.canShare() && displaySpec.startsWith("http")) {
+    if (
+      typeof navigator.share === "function" &&
+      displaySpec.startsWith("http")
+    ) {
       button = {
         id: "zen-copy-current-url-button",
-        command: event => {
-          const buttonRect = event.target.getBoundingClientRect();
-          /* eslint-disable mozilla/valid-services */
-          Services.zen.share(
-            currentUrl,
-            "",
-            "",
-            buttonRect.left,
-            window.innerHeight - buttonRect.bottom,
-            buttonRect.width,
-            buttonRect.height
-          );
+        command: () => {
+          // Native share sheet; the anchor rect used by the old desktop
+          // share call has no equivalent in the Web Share API.
+          navigator.share({ url: displaySpec }).catch(() => {});
         },
       };
     }
@@ -133,12 +140,12 @@ window.gZenCommonActions = {
 
   copyCurrentURLAsMarkdownToClipboard() {
     const [currentUrl, ClipboardHelper] = gURLBar.zenStrippedURI;
-    const tabTitle = getSelectedTab().label;
+    const tabTitle = getSelectedTabSync().label;
     let displaySpec = currentUrl.displaySpec;
 
     try {
       if (
-        getBoolPref("browser.urlbar.decodeURLsOnCopy", false) &&
+        getBoolPrefSync("browser.urlbar.decodeURLsOnCopy", false) &&
         !currentUrl.schemeIs("data")
       ) {
         displaySpec = decodeURI(displaySpec);
@@ -170,14 +177,14 @@ window.gZenCommonActions = {
    */
   shouldCloseTabOnBack() {
     if (
-      !getBoolPref(
+      !getBoolPrefSync(
         "zen.tabs.close-on-back-with-no-history",
         true
       )
     ) {
       return false;
     }
-    const tab = getSelectedTab();
+    const tab = getSelectedTabSync();
     return Boolean(
       tab.owner && !tab.pinned && !tab.hasAttribute("zen-empty-tab")
     );

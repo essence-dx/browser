@@ -2,27 +2,57 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-const lazy = {};
-ChromeUtils.defineESModuleGetters(lazy, {
-  JSONFile: "resource://gre/modules/JSONFile.sys.mjs",
-  setTimeout: "resource://gre/modules/Timer.sys.mjs",
-  TabStateCache: "resource:///modules/sessionstore/TabStateCache.sys.mjs",
-  ZenWindowSync: "resource:///modules/zen/ZenWindowSync.sys.mjs",
-  FeatureCallout: "resource:///modules/asrouter/FeatureCallout.sys.mjs",
+import { JSONFile } from "resource://gre/modules/JSONFile.sys.mjs";
+import { setTimeout as timerSetTimeout } from "resource://gre/modules/Timer.sys.mjs";
+import { TabStateCache } from "resource:///modules/sessionstore/TabStateCache.sys.mjs";
+import { ZenWindowSync } from "resource:///modules/zen/ZenWindowSync.sys.mjs";
+import { FeatureCallout } from "resource:///modules/asrouter/FeatureCallout.sys.mjs";
+import { nsRssLiveFolderProvider } from "resource:///modules/zen/RssLiveFolder.sys.mjs";
+import { nsGithubLiveFolderProvider } from "resource:///modules/zen/GithubLiveFolder.sys.mjs";
+
+const lazy = {
+  JSONFile,
+  setTimeout: timerSetTimeout,
+  TabStateCache,
+  ZenWindowSync,
+  FeatureCallout,
+};
+
+Object.defineProperty(lazy, "l10n", {
+  configurable: true,
+  enumerable: true,
+  get() {
+    let value;
+    try {
+      value = new Localization(["browser/zen-live-folders.ftl"]);
+    } catch {
+      value = {
+        formatMessages: async () => [{ attributes: [{ value: "" }] }],
+      };
+    }
+    Object.defineProperty(lazy, "l10n", {
+      value,
+      configurable: true,
+      writable: true,
+      enumerable: true,
+    });
+    return value;
+  },
 });
 
-ChromeUtils.defineLazyGetter(
-  lazy,
-  "l10n",
-  () => new Localization(["browser/zen-live-folders.ftl"])
-);
-
 // Chromium migration (lane 3): observers + prefs + tabs via adapters.
-// Gecko: Services.obs / Services.prefs / window.gBrowser. Chromium: chrome.events /
+// Gecko: observer/prefs/tab-strip APIs. Chromium: chrome.events /
 // chrome.storage / chrome.tabs (see src/zen/adapters/observers.mjs, adapters/prefs.mjs,
 // adapters/tabs.mjs). Icon chrome:// URL below becomes an extension URL.
 import { addObserver, removeObserver } from "../adapters/observers.mjs";
-import { getBoolPref, setBoolPref } from "../adapters/prefs.mjs";
+import { getBoolPrefSync, setBoolPref } from "../adapters/prefs.mjs";
+import {
+  getSelectedTabSync,
+  addTab,
+  removeTab,
+  pinTab,
+  setIcon,
+} from "../adapters/tabs.mjs";
 
 const DEFAULT_FETCH_INTERVAL = 30 * 60 * 1000;
 const providers = [
@@ -59,11 +89,10 @@ class nsZenLiveFoldersManager {
       return;
     }
 
-    for (const provider of providers) {
-      const module = ChromeUtils.importESModule(provider.path, {
-        global: "current",
-      });
-      const ProviderClass = module[provider.module];
+    for (const ProviderClass of [
+      nsRssLiveFolderProvider,
+      nsGithubLiveFolderProvider,
+    ]) {
       this.registry.set(ProviderClass.type, ProviderClass);
     }
 
@@ -338,19 +367,18 @@ class nsZenLiveFoldersManager {
         labelElement.removeAttribute("live-folder-animation");
       });
 
-    if (getBoolPref("zen.live-folders.promotion.shown", false)) {
+    if (getBoolPrefSync("zen.live-folders.promotion.shown", false)) {
       return;
     }
     setBoolPref("zen.live-folders.promotion.shown", true);
     let window = this.window;
-    // Chromium: chrome.tabs + extension callout; window.gBrowser is Gecko-only.
-    let gBrowser = window.gBrowser;
+    // Chromium: chrome.tabs + extension callout; the tab strip is Gecko-only.
     let isRightSide = window.gZenVerticalTabsManager._prefsRightSide;
     const callout = new lazy.FeatureCallout({
       win: this.window,
       location: "chrome",
       context: "chrome",
-      browser: gBrowser.selectedBrowser,
+      browser: getSelectedTabSync()?.linkedBrowser ?? null,
       theme: { preset: "chrome" },
     });
     callout.showFeatureCallout({
@@ -428,7 +456,7 @@ class nsZenLiveFoldersManager {
 
   // Live Folder Updates
   // -------------------
-  onLiveFolderFetch(liveFolder, items) {
+  async onLiveFolderFetch(liveFolder, items) {
     const folder = this.getFolderForLiveFolder(liveFolder);
     if (!folder) {
       return;
@@ -467,11 +495,13 @@ class nsZenLiveFoldersManager {
       existingItemIds.add(itemId);
     }
 
-    // Chromium: chrome.tabs.remove/create; window.gBrowser is Gecko-only.
-    this.window.gBrowser.removeTabs(outdatedTabs, {
-      skipSessionStore: true,
-      animate: !folder.collapsed,
-    });
+    // Chromium: chrome.tabs.remove/create; the tab strip is Gecko-only.
+    for (const outdatedTab of outdatedTabs) {
+      await removeTab(outdatedTab, {
+        skipSessionStore: true,
+        animate: !folder.collapsed,
+      });
+    }
 
     // Remove the dismissed items that are no longer in the given list.
     // Only do this when the fetch returned results — an empty list may
@@ -497,52 +527,57 @@ class nsZenLiveFoldersManager {
     }
 
     // Only add the items that are not already in the folder and was not dismissed by the user
-    const newItems = items
-      .filter(item => {
-        const compositeId = this.#makeCompositeId(liveFolder.id, item.id);
-        return (
-          !existingItemIds.has(compositeId) &&
-          !this.dismissedItems.has(compositeId)
-        );
-      })
-      .map(item => {
-        // Chromium: chrome.tabs.create({pinned:true}); addTrustedTab is Gecko-only.
-        const tab = this.window.gBrowser.addTrustedTab(item.url, {
-          createLazyBrowser: true,
-          inBackground: true,
-          skipAnimation: true,
-          noInitialLabel: true,
-          lazyTabTitle: item.title,
-          userContextId,
-        });
-        // Chromium: chrome.tabs.update(tabId,{pinned:true}); pinTab is Gecko-only.
-        this.window.gBrowser.pinTab(tab);
-        if (userContextId) {
-          tab.setAttribute("zenDefaultUserContextId", "true");
-        }
-        if (item.icon) {
-          // Chromium: chrome.tabs favicon; setIcon/TabStateCache are Gecko-only.
-          this.window.gBrowser.setIcon(tab, item.icon);
-          if (tab.linkedBrowser) {
-            lazy.TabStateCache.update(tab.linkedBrowser.permanentKey, {
-              image: null,
-            });
-          }
-        }
-        tab.setAttribute(
-          "zen-live-folder-item-id",
-          this.#makeCompositeId(liveFolder.id, item.id)
-        );
-        if (item.subtitle) {
-          tab.setAttribute("zen-show-sublabel", item.subtitle);
-          const tabLabel = tab.querySelector(".zen-tab-sublabel");
-          this.window.document.l10n.setArgs(tabLabel, {
-            tabSubtitle: item.subtitle,
+    const pendingItems = items.filter(item => {
+      const compositeId = this.#makeCompositeId(liveFolder.id, item.id);
+      return (
+        !existingItemIds.has(compositeId) &&
+        !this.dismissedItems.has(compositeId)
+      );
+    });
+    const newItems = [];
+    for (const item of pendingItems) {
+      // Chromium: chrome.tabs.create({pinned:true}); trusted tab creation
+      // is Gecko-only.
+      const tab = await addTab(item.url, {
+        createLazyBrowser: true,
+        inBackground: true,
+        skipAnimation: true,
+        noInitialLabel: true,
+        lazyTabTitle: item.title,
+        userContextId,
+      });
+      if (!tab) {
+        continue;
+      }
+      // Chromium: chrome.tabs.update(tabId,{pinned:true}); pinning helper
+      // lives in the tabs adapter.
+      await pinTab(tab);
+      if (userContextId) {
+        tab.setAttribute("zenDefaultUserContextId", "true");
+      }
+      if (item.icon) {
+        // Chromium: chrome.tabs favicon; icon cache update is Gecko-only.
+        await setIcon(tab, item.icon);
+        if (tab.linkedBrowser) {
+          lazy.TabStateCache.update(tab.linkedBrowser.permanentKey, {
+            image: null,
           });
         }
+      }
+      tab.setAttribute(
+        "zen-live-folder-item-id",
+        this.#makeCompositeId(liveFolder.id, item.id)
+      );
+      if (item.subtitle) {
+        tab.setAttribute("zen-show-sublabel", item.subtitle);
+        const tabLabel = tab.querySelector(".zen-tab-sublabel");
+        this.window.document.l10n.setArgs(tabLabel, {
+          tabSubtitle: item.subtitle,
+        });
+      }
 
-        return tab;
-      });
+      newItems.push(tab);
+    }
 
     // Wait for tabs to (hopefully) be initialized on all windows
     lazy.setTimeout(() => {

@@ -4,6 +4,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+@import url('../../compact-mode/windows-captions-fix-active.inc.css');
+@import url('../../compact-mode/windows-captions-fix-default.inc.css');
+/* Chromium: relative imports (were %include). Conditionally-applied contents
+   noted at use sites below. */
+
 --zen-toolbar-height: 34px;
 
 height: var(--zen-toolbar-height);
@@ -14,12 +19,13 @@ z-index: 1;
   min-height: var(--zen-toolbar-height);
 }
 
-@media -moz-pref('zen.view.hide-window-controls') {
+/* was @media -moz-pref('zen.view.hide-window-controls') — gate via [data-zen-...] attr. */
+@media all {
   transition: height var(--zen-hidden-toolbar-transition), opacity var(--zen-hidden-toolbar-transition);
   transition-delay: 0.2s;
   overflow: clip;
 
-%include ../../compact-mode/windows-captions-fix-active.inc.css
+  /* windows-captions-fix-active.inc.css now imported at top level (Chromium). */
 
   &:not([zen-has-hover='true']):not([has-popup-menu]):not([zen-compact-mode-active]) {
     height: var(--zen-element-separation);
@@ -28,10 +34,11 @@ z-index: 1;
       pointer-events: none;
     }
 
-%include ../../compact-mode/windows-captions-fix-default.inc.css
+    /* windows-captions-fix-default.inc.css now imported at top level (Chromium). */
   }
 
-  @media -moz-pref('zen.view.experimental-no-window-controls') or (not -moz-pref("browser.tabs.inTitlebar")) {
+  /* was -moz-pref('zen.view.experimental-no-window-controls') / (not -moz-pref("browser.tabs.inTitlebar")). */
+  @media all {
     :root:not([zen-has-bookmarks]) & {
       max-height: 0 !important;
       overflow: hidden;

@@ -3,8 +3,12 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import { ZenUIComponent } from "./ZenUIComponent.sys.mjs";
-import { createXULElementLocal } from "../../../adapters/xul.mjs";
-// Gecko now (gBrowser progress below); Chromium: chrome.tabs.onUpdated —
+import { makeXulElement } from "../../../adapters/xul.mjs";
+import {
+  getSelectedTabSync,
+  getTabForBrowser,
+} from "../../../adapters/tabs.mjs";
+// Gecko now (tab progress below); Chromium: chrome.tabs.onUpdated —
 // wire when surfer.json migration.engine === "chromium".
 
 const WAIT_BEFORE_SHOWING_LONG_LOAD = 3000;
@@ -29,9 +33,8 @@ export class ZenProgressBar extends ZenUIComponent {
   }
 
   on_TabSelect() {
-    const gBrowser = this.window.gBrowser;
-    const selectedTab = gBrowser.selectedTab;
-    this.onLocationChange(gBrowser.getBrowserForTab(selectedTab));
+    const selectedTab = getSelectedTabSync();
+    this.onLocationChange(selectedTab?.linkedBrowser);
   }
 
   get #progressBar() {
@@ -39,7 +42,7 @@ export class ZenProgressBar extends ZenUIComponent {
       return null;
     }
     if (!this.#element) {
-      this.#element = createXULElementLocal("hbox");
+      this.#element = makeXulElement("hbox");
       // Chromium: document.createElement("hbox").
       this.#element.id = "zen-loading-progress-bar";
     }
@@ -67,9 +70,7 @@ export class ZenProgressBar extends ZenUIComponent {
 
   async #checkBrowserProgress(webProgress) {
     await this.#promise;
-    const window = this.window;
-    const gBrowser = window.gBrowser;
-    const tab = gBrowser.getTabForBrowser(webProgress);
+    const tab = await getTabForBrowser(webProgress);
     const isLoading =
       tab?.selected &&
       (tab.hasAttribute("busy") || tab.hasAttribute("progress"));

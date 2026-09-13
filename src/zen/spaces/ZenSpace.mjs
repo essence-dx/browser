@@ -3,6 +3,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { nsZenFolder } from "../folders/ZenFolder.mjs";
+import { getElementBase, makeXulElement, parseXULFragment } from "../adapters/xul.mjs";
+import { getBoolPrefSync } from "../adapters/prefs.mjs";
+import { isTab, invalidateCachedVisibleTabs } from "../adapters/tabs.mjs";
+import { getTopWindow } from "../adapters/windows.mjs";
+import { ZenWindowSync } from "../sessionstore/ZenWindowSync.sys.mjs";
 
 // A helper class to manage collapsible pinned tabs in a workspace.
 
@@ -38,7 +43,7 @@ class nsZenCollapsiblePins extends nsZenFolder {
       this.#spaceElement.removeAttribute("collapsedpinnedtabs");
     }
     super.collapsed = value;
-    gBrowser.tabContainer._invalidateCachedVisibleTabs();
+    invalidateCachedVisibleTabs();
   }
 
   toggle() {
@@ -46,7 +51,7 @@ class nsZenCollapsiblePins extends nsZenFolder {
   }
 }
 
-export class nsZenWorkspace extends MozXULElement {
+export class nsZenWorkspace extends getElementBase() {
   #initialPinnedElementChildrenCount;
   #hasConnected = false;
 
@@ -130,7 +135,7 @@ export class nsZenWorkspace extends MozXULElement {
     this.initializeAttributeInheritance();
 
     this.scrollbox = this.querySelector("arrowscrollbox");
-    this.scrollbox.smoothScroll = Services.prefs.getBoolPref(
+    this.scrollbox.smoothScroll = getBoolPrefSync(
       "zen.startup.smooth-scroll-in-tabs",
       false
     );
@@ -183,7 +188,7 @@ export class nsZenWorkspace extends MozXULElement {
       let actionsButton = this.indicator.querySelector(
         ".zen-workspaces-actions"
       );
-      const moveTabToFragment = window.MozXULElement.parseXULToFragment(
+      const moveTabToFragment = parseXULFragment(
         nsZenWorkspace.moveTabToButtonMarkup
       );
       actionsButton.after(moveTabToFragment);
@@ -201,7 +206,7 @@ export class nsZenWorkspace extends MozXULElement {
         ...this.tabsContainer.children,
       ];
       if (
-        Services.prefs.getBoolPref("zen.view.show-newtab-button-top", false)
+        getBoolPrefSync("zen.view.show-newtab-button-top", false)
       ) {
         // Move the perifery to the first non-pinned tab
         const periphery = this.tabsContainer.querySelector(
@@ -209,7 +214,7 @@ export class nsZenWorkspace extends MozXULElement {
         );
         if (periphery) {
           const firstNonPinnedTabIndex = children.findIndex(
-            child => gBrowser.isTab(child) && !child.pinned
+            child => isTab(child) && !child.pinned
           );
           if (firstNonPinnedTabIndex > -1) {
             // Change to new location and remove from the old one on the list
@@ -229,7 +234,7 @@ export class nsZenWorkspace extends MozXULElement {
     };
 
     this.scrollbox._canScrollToElement = element => {
-      if (gBrowser.isTab(element)) {
+      if (isTab(element)) {
         return (
           !element.hasAttribute("zen-essential") &&
           !this.hasAttribute("positionpinnedtabs") &&
@@ -261,7 +266,7 @@ export class nsZenWorkspace extends MozXULElement {
     this.tabsContainer.setAttribute("zen-workspace-id", this.id);
     this.pinnedTabsContainer.setAttribute("zen-workspace-id", this.id);
 
-    this.collapsiblePins = document.createXULElement(
+    this.collapsiblePins = makeXulElement(
       "zen-workspace-collapsible-pins"
     );
     this.prepend(this.collapsiblePins);
@@ -336,7 +341,11 @@ export class nsZenWorkspace extends MozXULElement {
 
   handleEvent(event) {
     if (this.active) {
-      gBrowser.tabContainer.handleEvent(event);
+      try {
+        this.scrollbox?.dispatchEvent(
+          new CustomEvent("zen-workspace-scroll", { detail: event })
+        );
+      } catch {}
     }
   }
 
@@ -431,9 +440,6 @@ export class nsZenWorkspace extends MozXULElement {
     for (const workspace of workspaces) {
       const item = gZenWorkspaces.generateMenuItemForWorkspace(workspace);
       item.addEventListener("command", async () => {
-        const { ZenWindowSync } = ChromeUtils.importESModule(
-          "resource:///modules/zen/ZenWindowSync.sys.mjs"
-        );
         ZenWindowSync.moveTabsToSyncedWorkspace(window, workspace.uuid);
       });
       popup.appendChild(item);

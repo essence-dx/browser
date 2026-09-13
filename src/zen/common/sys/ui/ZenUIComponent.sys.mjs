@@ -7,6 +7,7 @@
  * UI components are responsible for managing their own event listeners
  * and providing a consistent interface for handling events.
  */
+import { addTabsProgressListener } from "../../../adapters/tabs.mjs";
 export class ZenUIComponent {
   #window = null;
   #eventListeners = new Set();
@@ -44,14 +45,16 @@ export class ZenUIComponent {
     this.#eventListeners.add({ type, options });
   }
 
-  listenBrowserTabsProgress() {
-    // Gecko tab-progress listeners; Chromium: chrome.tabs.onUpdated.
-    this.#window.gBrowser.addTabsProgressListener(this);
+  async listenBrowserTabsProgress() {
+    // Tab-progress listeners live in the tabs adapter (Gecko tabbrowser,
+    // Chromium chrome.tabs.onUpdated).
+    await addTabsProgressListener(this);
   }
 
-  listenBrowserProgress() {
-    // Gecko progress listener; Chromium: chrome.tabs.onUpdated.
-    this.#window.gBrowser.addProgressListener(this);
+  async listenBrowserProgress() {
+    // Generic progress listener; tab progress covers this on Chromium
+    // (chrome.tabs.onUpdated) — same adapter.
+    await addTabsProgressListener(this);
   }
 
   handleEvent(event) {

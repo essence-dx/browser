@@ -2,31 +2,45 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
-
 // Chromium migration (lane 3): action enablement + selected tab via adapters.
-// Gecko: Services.prefs / window.gBrowser. Chromium: chrome.storage / chrome.tabs
+// Legacy pref store / tab strip map to storage / tabs adapters
 // (see src/zen/adapters/prefs.mjs, adapters/tabs.mjs).
-// Icon chrome:// URLs below become extension icon URLs at the shell layer;
-// UrlbarProvider shell maps to chrome.omnibox below.
-import { getBoolPref, setIntPref } from "../adapters/prefs.mjs";
-import { getSelectedTab } from "../adapters/tabs.mjs";
+// Icon URLs below become extension icon URLs at the shell layer;
+// UrlbarProvider shell maps to omnibox below.
+import {
+  defineLazyPref,
+  getBoolPref,
+  getBoolPrefSync,
+  setIntPref,
+} from "../adapters/prefs.mjs";
+import { getSelectedTabSync } from "../adapters/tabs.mjs";
+import { gZenBoostsManager } from "../boosts/ZenBoostsManager.sys.mjs";
 
 const lazy = {};
 
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "currentTheme",
-  "zen.view.window.scheme",
-  2
-);
+defineLazyPref(lazy, "currentTheme", "zen.view.window.scheme", 2);
 
-ChromeUtils.defineLazyGetter(lazy, "l10n", () => {
-  return new Localization(["browser/zen-command-palette.ftl"], true);
+Object.defineProperty(lazy, "l10n", {
+  configurable: true,
+  enumerable: true,
+  get() {
+    const value = new Localization(["browser/zen-command-palette.ftl"], true);
+    Object.defineProperty(lazy, "l10n", {
+      configurable: true,
+      enumerable: true,
+      value,
+      writable: true,
+    });
+    return value;
+  },
 });
 
+function getSelectedTabURI(win) {
+  return getSelectedTabSync(win)?.linkedBrowser?.currentURI;
+}
+
 function isNotEmptyTab(window) {
-  return !getSelectedTab(window)?.hasAttribute("zen-empty-tab");
+  return !getSelectedTabSync(window)?.hasAttribute("zen-empty-tab");
 }
 
 const globalActionsTemplate = [
@@ -80,7 +94,7 @@ const globalActionsTemplate = [
     command: "cmd_zenTogglePinTab",
     icon: "chrome://browser/skin/zen-icons/pin.svg",
     isAvailable: window => {
-      const tab = getSelectedTab(window);
+      const tab = getSelectedTabSync(window);
       return !tab?.hasAttribute("zen-empty-tab") && !tab?.pinned;
     },
   },
@@ -89,7 +103,7 @@ const globalActionsTemplate = [
     command: "cmd_zenTogglePinTab",
     icon: "chrome://browser/skin/zen-icons/unpin.svg",
     isAvailable: window => {
-      const tab = getSelectedTab(window);
+      const tab = getSelectedTabSync(window);
       return !tab?.hasAttribute("zen-empty-tab") && tab?.pinned;
     },
   },
@@ -106,18 +120,18 @@ const globalActionsTemplate = [
         return false;
       }
 
-      // Chromium: chrome.storage (getBoolPref) gates the boost action.
-      if (!getBoolPref("zen.boosts.enabled", false)) {
+      // Chromium: storage-backed pref gates the boost action.
+      if (!getBoolPrefSync("zen.boosts.enabled", false)) {
         return false;
       }
 
-      // Chromium: tab URL via chrome.tabs.query({active:true}).
-      const uri = window.gBrowser.currentURI;
+      // Chromium: tab URL via active tab query.
+      const uri = getSelectedTabURI(window);
       return !!uri?.schemeIs && (uri.schemeIs("http") || uri.schemeIs("https"));
     },
     command: window => {
-      // Chromium: tab URL via chrome.tabs.query({active:true}).
-      const uri = window.gBrowser.currentURI;
+      // Chromium: tab URL via active tab query.
+      const uri = getSelectedTabURI(window);
       if (!uri?.schemeIs || !(uri.schemeIs("http") || uri.schemeIs("https"))) {
         return;
       }
@@ -133,9 +147,6 @@ const globalActionsTemplate = [
         return;
       }
 
-      const { gZenBoostsManager } = ChromeUtils.importESModule(
-        "resource:///modules/zen/boosts/ZenBoostsManager.sys.mjs"
-      );
       const boost = gZenBoostsManager.createNewBoost(domain);
       if (!boost) {
         return;
@@ -204,9 +215,9 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-add-to-essentials",
     command: window =>
-      window.gZenPinnedTabManager.addToEssentials(getSelectedTab(window)),
+      window.gZenPinnedTabManager.addToEssentials(getSelectedTabSync(window)),
     isAvailable: window => {
-      const tab = getSelectedTab(window);
+      const tab = getSelectedTabSync(window);
       return (
         window.gZenPinnedTabManager.canEssentialBeAdded(tab) &&
         !tab?.hasAttribute("zen-essential")
@@ -217,9 +228,9 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-remove-from-essentials",
     command: window =>
-      window.gZenPinnedTabManager.removeEssentials(getSelectedTab(window)),
+      window.gZenPinnedTabManager.removeEssentials(getSelectedTabSync(window)),
     isAvailable: window =>
-      getSelectedTab(window)?.hasAttribute("zen-essential") ?? false,
+      getSelectedTabSync(window)?.hasAttribute("zen-essential") ?? false,
     icon: "chrome://browser/skin/zen-icons/essential-remove.svg",
   },
   {

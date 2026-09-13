@@ -4,6 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+@import url('zen-overflowing-addons.css');
+/* Chromium: relative import (was %include). */
+
 #nav-bar,
 #zen-sidebar-top-buttons {
   background: transparent;
@@ -12,5 +15,3 @@
 :root[inDOMFullscreen="true"] #zen-appcontent-navbar-wrapper {
   visibility: collapse;
 }
-
-%include zen-overflowing-addons.css

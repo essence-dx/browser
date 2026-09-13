@@ -7,17 +7,41 @@
 "use strict";
 
 // Chromium migration (lane 3): DnD prefs + tab strip via adapters.
-// Gecko: Services.prefs / gBrowser / Ci.nsIZenDragAndDrop (native window move).
-// Chromium: chrome.storage / chrome.tabs + HTML5 DnD / chrome.windows drag region
-// (see src/zen/adapters/prefs.mjs, adapters/tabs.mjs). Native XPCOM service below
+// Legacy pref store / tab strip / native window-move service map to
+// storage / tabs adapters + shell drag region
+// (see src/zen/adapters/prefs.mjs, adapters/tabs.mjs). Native service below
 // stays until the shell drag shim lands.
+import {
+  defineLazyPref,
+  getBoolPrefSync,
+  getIntPrefSync,
+  playHapticFeedback,
+} from "../adapters/prefs.mjs";
+import {
+  getSelectedTabsSync,
+  getTabsSync,
+  isTab,
+  isTabGroup,
+  isTabGroupLabel,
+  setSelectedTab,
+} from "../adapters/tabs.mjs";
+import { makeXulElement } from "../adapters/xul.mjs";
+import { createZenEssentialsPromo } from "../tabs/ZenEssentialsPromo.mjs";
 
 // Wrap in a block to prevent leaking to window scope.
 {
-  const isTab = element => gBrowser.isTab(element); // Chromium: chrome.tabs (element dataset).
-  const isTabGroupLabel = element => gBrowser.isTabGroupLabel(element);
   const isEssentialsPromo = element =>
     element?.tagName.toUpperCase() == "ZEN-ESSENTIALS-PROMO";
+
+  const countEssentials = () => {
+    try {
+      return getTabsSync().filter(tab =>
+        tab?.hasAttribute?.("zen-essential")
+      ).length;
+    } catch {
+      return 0;
+    }
+  };
 
   /**
    * The elements in the tab strip from `this.ariaFocusableItems` that contain
@@ -60,7 +84,7 @@
     if (isTabGroupLabel(element)) {
       return element.closest(".tab-group-label-container");
     }
-    if (gBrowser.isTabGroup(element)) {
+    if (isTabGroup(element)) {
       return element.labelContainerElement;
     }
     throw new Error(`Element "${element.tagName}" is not expected to move`);
@@ -81,52 +105,49 @@
     constructor(tabbrowserTabs) {
       super(tabbrowserTabs);
 
-      // Chromium: XPCOM lazy service has no equivalent; shell provides a drag shim.
-      XPCOMUtils.defineLazyServiceGetter(
-        this,
-        "ZenDragAndDropService",
-        "@mozilla.org/zen/drag-and-drop;1",
-        Ci.nsIZenDragAndDrop
-      );
+      // Chromium: shell provides a drag shim where native move is unavailable.
+      this.ZenDragAndDropService = {
+        onDragStart() {},
+        onDragEnd() {},
+      };
+      try {
+        this.ZenDragAndDropService =
+          Cc["@mozilla.org/zen/drag-and-drop;1"].getService(
+            Ci.nsIZenDragAndDrop
+          );
+      } catch {}
 
-      // Chromium: chrome.storage (getBoolPref/getIntPref); XPCOM lazy pref is Gecko-only.
-      XPCOMUtils.defineLazyPreferenceGetter(
+      // Chromium: storage-backed prefs replace legacy lazy prefs.
+      defineLazyPref(
         this,
         "_dndSplitEnabled",
         "zen.splitView.enable-drag-over-split",
         true
       );
-      // Chromium: chrome.storage (getBoolPref/getIntPref); XPCOM lazy pref is Gecko-only.
-      XPCOMUtils.defineLazyPreferenceGetter(
+      // Chromium: storage-backed prefs replace legacy lazy prefs.
+      defineLazyPref(
         this,
         "_dndSplitThreshold",
         "zen.splitView.drag-over-split-threshold",
         25
       );
-      // Chromium: chrome.storage (getBoolPref/getIntPref); XPCOM lazy pref is Gecko-only.
-      XPCOMUtils.defineLazyPreferenceGetter(
+      // Chromium: storage-backed prefs replace legacy lazy prefs.
+      defineLazyPref(
         this,
         "_dndSplitDelay",
         "zen.splitView.drag-over-split-delayMC",
         300
       );
-      // Chromium: chrome.storage (getBoolPref/getIntPref); XPCOM lazy pref is Gecko-only.
-      XPCOMUtils.defineLazyPreferenceGetter(
+      // Chromium: storage-backed prefs replace legacy lazy prefs.
+      defineLazyPref(
         this,
         "_dndSwitchSpaceDelay",
         "zen.tabs.dnd-switch-space-delay",
         1000
       );
 
-      // Chromium: extension module URL; chrome:// dynamic import is Gecko-only.
-      ChromeUtils.defineESModuleGetters(
-        this,
-        {
-          createZenEssentialsPromo:
-            "chrome://browser/content/zen-components/ZenEssentialsPromo.mjs",
-        },
-        { global: "current" }
-      );
+      // Chromium: static extension module import replaces dynamic loading.
+      this.createZenEssentialsPromo = createZenEssentialsPromo;
     }
 
     init() {
@@ -156,7 +177,9 @@
       if (isTabGroupLabel(tab)) {
         tab = tab.group;
       }
-      const draggingTabs = tab.multiselected ? gBrowser.selectedTabs : [tab];
+      const draggingTabs = tab.multiselected
+        ? getSelectedTabsSync()
+        : [tab];
       const { offsetX, offsetY } = this.#getDragImageOffset(
         event,
         tab,
@@ -219,7 +242,7 @@
             Math.floor(tabLabelParentWidth / 6)
           );
         } else if (
-          gBrowser.isTabGroup(tabClone) &&
+          isTabGroup(tabClone) &&
           tabClone.hasAttribute("split-view-group")
         ) {
           let tabs = tab.tabs;
@@ -569,12 +592,10 @@
           dropElementSize
         );
 
-        // Chromium: chrome.storage (drag threshold pref); Services.prefs is Gecko-only.
-        moveOverThreshold = gBrowser._tabGroupsEnabled
-          ? Services.prefs.getIntPref(
-              "browser.tabs.dragDrop.moveOverThresholdPercent"
-            ) / 100
-          : 0.5;
+        // Chromium: storage-backed drag threshold pref.
+        moveOverThreshold =
+          getIntPrefSync("browser.tabs.dragDrop.moveOverThresholdPercent", 50) /
+          100;
         moveOverThreshold = Math.min(1, Math.max(0, moveOverThreshold));
         let shouldMoveOver = overlapPercent > moveOverThreshold;
         if (logicalForward && shouldMoveOver) {
@@ -652,8 +673,8 @@
         ".pinned-tabs-container-separator"
       );
       // Make sure to always return the separator at the start of the array
-      // Chromium: chrome.storage (newtab-button pref); Services.prefs is Gecko-only.
-      return Services.prefs.getBoolPref("zen.view.show-newtab-button-top")
+      // Chromium: storage-backed newtab-button pref.
+      return getBoolPrefSync("zen.view.show-newtab-button-top", true)
         ? [separator, gZenWorkspaces.activeWorkspaceElement.newTabButton]
         : [separator];
     }
@@ -672,10 +693,8 @@
         return { isNearLeftEdge: false, isNearRightEdge: false };
       }
 
-      // Chromium: chrome.storage (dnd padding pref); Services.prefs is Gecko-only.
-      const padding = Services.prefs.getIntPref(
-        "zen.workspaces.dnd-switch-padding"
-      );
+      // Chromium: storage-backed dnd padding pref.
+      const padding = getIntPrefSync("zen.workspaces.dnd-switch-padding", 10);
       // If we are hovering over the edges of the gNavToolbox or the splitter, we
       // can change the workspace after a short delay.
       const splitter = document.getElementById("zen-sidebar-splitter");
@@ -887,7 +906,7 @@
         this.#dragOverSplit.fakeTab.remove();
       }
 
-      const element = document.createXULElement("zen-split-fake-tab");
+      const element = makeXulElement("zen-split-fake-tab");
       const firstChild = dropElement.firstChild;
       if (dropSide === "left") {
         firstChild.before(element);
@@ -948,7 +967,7 @@
       let dragData = draggedTab._dragData;
       let movingTabs = dragData.movingTabs;
       if (!this._browserDragImageWrapper) {
-        const wrappingDiv = document.createXULElement("vbox");
+        const wrappingDiv = makeXulElement("vbox");
         canvas.style.borderRadius = "8px";
         canvas.style.border = "2px solid white";
         wrappingDiv.style.width = 200 + "px";
@@ -1006,7 +1025,7 @@
             for (let tab of movingTabs) {
               tab.setAttribute("zen-workspace-id", activeWorkspace);
             }
-            gBrowser.selectedTab = draggedTab;
+            void setSelectedTab(draggedTab);
           } else if (isTabGroupLabel(draggedTab)) {
             draggedTab = draggedTab.group;
             gZenFolders.changeFolderToSpace(draggedTab, activeWorkspace, {
@@ -1120,10 +1139,10 @@
         };
         const items = this._tabbrowserTabs.ariaFocusableItems;
         let rect = window.windowUtils.getBoundsWithoutFlushing(draggedTab);
-        let focusableDropElement = gBrowser.isTabGroup(dropElement)
+        let focusableDropElement = isTabGroup(dropElement)
           ? dropElement.labelElement
           : dropElement;
-        let focusableDraggedTab = gBrowser.isTabGroup(draggedTab)
+        let focusableDraggedTab = isTabGroup(draggedTab)
           ? draggedTab.labelElement
           : draggedTab;
         let tabsInBetween = [];
@@ -1189,7 +1208,7 @@
       const draggedTab = dt.mozGetDataAt(TAB_DROP_TYPE, 0);
       let ownerGlobal = draggedTab?.documentGlobal;
       draggedTab.style.visibility = "";
-      let thisFromGlobal = ownerGlobal?.gBrowser.tabContainer.tabDragAndDrop;
+      let thisFromGlobal = this;
       let currentEssenialContainer =
         ownerGlobal.gZenWorkspaces.getCurrentEssentialsContainer();
       if (currentEssenialContainer?.essentialsPromo) {
@@ -1321,8 +1340,11 @@
           event.target.classList.contains("zen-workspace-empty-space") ||
           hoveringPeriphery
         ) {
-          let lastTab = gBrowser.tabs.at(-1);
-          let pinnedTabsCount = gBrowser._numVisiblePinTabsWithoutCollapsed;
+          let allStripTabs = getTabsSync();
+          let lastTab = allStripTabs.at(-1);
+          let pinnedTabsCount = allStripTabs.filter(
+            tab => tab?.pinned
+          ).length;
 
           // Only if there are no normal tabs to drop after
           showIndicatorUnderNewTabButton =
@@ -1330,8 +1352,8 @@
           let useLastPinned =
             (hoveringPeriphery ||
               (showIndicatorUnderNewTabButton &&
-                !(pinnedTabsCount - gBrowser._numZenEssentials))) &&
-            Services.prefs.getBoolPref("zen.view.show-newtab-button-top");
+                !(pinnedTabsCount - countEssentials()))) &&
+            getBoolPrefSync("zen.view.show-newtab-button-top", true);
           dropElement =
             (useLastPinned
               ? this._tabbrowserTabs.ariaFocusableItems.at(pinnedTabsCount)
@@ -1374,9 +1396,7 @@
       // We wan't to leave a small threshold (20% for example) so we can drag tabs below and above
       // a folder label without dragging into the folder.
       let threshold =
-        Services.prefs.getIntPref(
-          "zen.tabs.folder-dragover-threshold-percent"
-        ) / 100;
+        getIntPrefSync("zen.tabs.folder-dragover-threshold-percent", 20) / 100;
       let dropIntoFolder =
         isZenFolder &&
         (overlapPercent < threshold ||
@@ -1418,9 +1438,8 @@
         const indicator = gZenPinnedTabManager.dragIndicator;
         let top = 0;
         threshold =
-          Services.prefs.getIntPref(
-            "browser.tabs.dragDrop.moveOverThresholdPercent"
-          ) / 100;
+          getIntPrefSync("browser.tabs.dragDrop.moveOverThresholdPercent", 50) /
+          100;
         if (overlapPercent > threshold || showIndicatorUnderNewTabButton) {
           top = Math.round(rect.top + rect.height) + "px";
           dropBefore = false;
@@ -1458,9 +1477,7 @@
         if (dropElement.classList.contains("zen-current-workspace-indicator")) {
           dropElement =
             elementToMove(
-              this._tabbrowserTabs.ariaFocusableItems.at(
-                gBrowser._numZenEssentials
-              )
+              this._tabbrowserTabs.ariaFocusableItems.at(countEssentials())
             ) || dropElement;
           dropBefore = true;
         }
@@ -1472,8 +1489,7 @@
         shouldPlayHapticFeedback = false;
       }
       if (shouldPlayHapticFeedback) {
-        // eslint-disable-next-line mozilla/valid-services
-        Services.zen.playHapticFeedback();
+        playHapticFeedback();
       }
       return [dropBefore, dropElement];
     }
@@ -1509,12 +1525,12 @@
       }
 
       if (!this._fakeEssentialTab) {
-        const numEssentials = gBrowser._numZenEssentials;
+        const numEssentials = countEssentials();
         let pinnedTabs = this._tabbrowserTabs.ariaFocusableItems.slice(
           0,
           numEssentials
         );
-        this._fakeEssentialTab = document.createXULElement("vbox");
+        this._fakeEssentialTab = makeXulElement("vbox");
         this._fakeEssentialTab.elementIndex = numEssentials;
         delete dragData.animDropElementIndex;
         if (!draggedTab.hasAttribute("zen-essential")) {
@@ -1581,7 +1597,7 @@
 
       let tabs = this._tabbrowserTabs.visibleTabs.slice(
         0,
-        gBrowser._numZenEssentials
+        countEssentials()
       );
       if (usingFakeElement) {
         tabs.push(this._fakeEssentialTab);
@@ -1758,7 +1774,7 @@
       }
 
       // eslint-disable-next-line mozilla/valid-services
-      Services.zen.playHapticFeedback();
+      playHapticFeedback();
 
       dragData.animDropElementIndex = newIndex;
       dragData.dropElement = tabs[Math.min(newIndex, tabs.length - 1)];
@@ -1781,7 +1797,7 @@
         delete this._fakeEssentialTab;
         for (let tab of this._tabbrowserTabs.visibleTabs.slice(
           0,
-          gBrowser._numZenEssentials
+          countEssentials()
         )) {
           tab.style.transform = "";
         }

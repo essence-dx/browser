@@ -2,8 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { getBoolPref, getIntPref, setIntPref } from "../../adapters/prefs.mjs";
-import { createXULElementLocal, parseXULFragment } from "../../adapters/xul.mjs";
+import { getBoolPrefSync, getIntPrefSync, setIntPref } from "../../adapters/prefs.mjs";
+import { makeXulElement, parseXULFragment } from "../../adapters/xul.mjs";
 // Gecko now (XUL menubar); Chromium: HTML menu — wire when migration.engine
 // === "chromium".
 
@@ -50,7 +50,7 @@ export class nsZenMenuBar {
     });
     const viewMenu = document.getElementById("view-menu");
     const parentPopup = viewMenu.querySelector("menupopup");
-    parentPopup.prepend(createXULElementLocal("menuseparator"));
+    parentPopup.prepend(makeXulElement("menuseparator"));
     parentPopup.prepend(menu);
 
     const sibling = document.getElementById("viewSidebarMenuMenu");
@@ -63,7 +63,7 @@ export class nsZenMenuBar {
     }
 
     parentPopup.addEventListener("popupshowing", () => {
-      const currentScheme = getIntPref(WINDOW_SCHEME_PREF);
+      const currentScheme = getIntPrefSync(WINDOW_SCHEME_PREF);
       for (const [type, value] of Object.entries(WINDOW_SCHEME_MAPPING)) {
         let menuItem = menu.querySelector(`menuitem[data-type="${type}"]`);
         if (value === currentScheme) {
@@ -138,7 +138,7 @@ export class nsZenMenuBar {
   }
 
   #hideWindowRestoreMenus() {
-    if (!getBoolPref("zen.window-sync.enabled", true)) {
+    if (!getBoolPrefSync("zen.window-sync.enabled", true)) {
       return;
     }
     const itemsToHide = [

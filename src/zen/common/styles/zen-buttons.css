@@ -3,14 +3,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-
-@namespace html "http://www.w3.org/1999/xhtml";
-@namespace xul "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
+/* Chromium: HTML parsing needs no XUL namespaces (were @namespace html/xul).
+   xul|button below becomes plain button. */
 
 /** This file is used to override UI inside "common-shared.css" */
 
 /** These types of buttons look INSAINELY bad in the preferences page */
-xul|button {
+button {
   --size-item-large: 34px;
 
   padding: var(--zen-button-padding) !important;
@@ -30,7 +29,8 @@ dialog::part(dialog-button) {
   border-radius: calc(10px * var(--zen-squircle-value));
 }
 
-@media (-moz-platform: macos) {
+/* was @media (-moz-platform: macos) — gate macOS via [data-platform="macos"] on Chromium. */
+@media all {
   dialog[defaultButton="accept"]::part(dialog-button) {
     &:is([dlgtype="accept"], [dlgtype="cancel"]) {
       padding-inline-end: 3.7em;

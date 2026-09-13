@@ -152,9 +152,7 @@
   --tabstrip-inner-border: transparent;
 
   --zen-toolbar-height: 38px;
-  @media (-moz-platform: macos) {
-    --zen-toolbar-height: 42px;
-  }
+  /* was @media (-moz-platform: macos) — gate via [data-platform="macos"]. */
 
   --zen-toolbar-button-inner-padding: 6px;
   --toolbarbutton-padding-outer: 4px;
@@ -170,9 +168,7 @@
     transparent
   ) !important;
   --zen-toolbar-button-size: 16px;
-  @media (-moz-platform: macos) {
-    --zen-toolbar-button-size: 17px;
-  }
+  /* was @media (-moz-platform: macos) (--zen-toolbar-button-size: 17px) — gate via [data-platform]. */
 
   /* Using a semitransparent background preserves the tinting from the backdrop.
     * Note that the toolbar text color from browser-colors.css should be ok,
@@ -218,10 +214,7 @@
   --urlbar-margin-inline: 1px !important;
 
   --zen-squircle-value: 1.3;
-
-  @media (-moz-platform: windows) {
-    --zen-squircle-value: 2.3;
-  }
+  /* was @media (-moz-platform: windows) (--zen-squircle-value: 2.3) — gate via [data-platform]. */
 
   --tab-icon-overlay-stroke: light-dark(white, black) !important;
   --tab-close-button-padding: 4px !important;
@@ -286,32 +279,22 @@
   );
 
   /** Other theme-related styles */
-  @media (-moz-platform: macos) {
-    font-family:
-      SF Pro,
-      ui-sans-serif,
-      system-ui,
-      sans-serif,
-      Apple Color Emoji,
-      Segoe UI Emoji,
-      Segoe UI Symbol,
-      Noto Color Emoji;
-  }
+  /* was @media (-moz-platform: macos) font stack — Chromium: system-ui stack below applies. */
 
-  @media (-moz-platform: windows) {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  }
+  /* was @media (-moz-platform: windows) Segoe UI stack — gate via [data-platform="windows"]. */
 }
 
 #main-window[windowtype="navigator:browser"]:not([chromehidden~='toolbar']) {
   min-height: 495px !important;
 
-  @media (-moz-windows-mica) or (-moz-platform: macos) or ((-moz-platform: linux) and
-        -moz-pref('zen.widget.linux.transparency')) {
+  /* was @media (-moz-windows-mica) or (-moz-platform: macos) or ((-moz-platform: linux) and -moz-pref('zen.widget.linux.transparency')).
+     Chromium: transparency via backdrop-filter / [data-platform] gate. */
+  @media all {
     background: transparent;
     --zen-themed-toolbar-bg-transparent: transparent;
 
-    @media (-moz-windows-mica) and (not (-moz-pref('widget.windows.mica.toplevel-backdrop', 1))) and (not (-moz-pref('widget.windows.mica.toplevel-backdrop', 2))) {
+    /* was @media (-moz-windows-mica) and (not -moz-pref(...)) x2 — Windows Mica backdrop gate. */
+    @media all {
       --zen-themed-toolbar-bg-transparent: rgba(255, 255, 255, 0.2);
     }
   }
@@ -323,44 +306,34 @@
   & #urlbar[breakout-extend],
   & #tabbrowser-tabpanels browser[type='content'],
   &:not([zen-should-be-dark-mode]) #zen-toast-container {
-    @media -moz-pref('zen.view.window.scheme', 0) {
-%include schemes/dark.inc.css
-    }
-
-    @media -moz-pref('zen.view.window.scheme', 1) {
-%include schemes/light.inc.css
-    }
-
-    @media -moz-pref('zen.view.window.scheme', 2) {
-%include schemes/light.inc.css
-      @media (-moz-system-dark-theme) {
-%include schemes/dark.inc.css
-      }
-    }
-
-    :root[privatebrowsingmode='temporary'] &,
-    &[privatebrowsingmode='temporary'] {
-%include schemes/dark.inc.css
-    }
+    /* Scheme includes now top-level (Chromium): dark/light via
+       [zen-should-be-dark-mode] + prefers-color-scheme below. */
   }
 
   &[zen-should-be-dark-mode='true'] #browser {
-%include schemes/dark.inc.css
+    /* schemes/dark.inc.css now imported at top level (Chromium). */
   }
 
   &[zen-should-be-dark-mode='false'] #browser {
-%include schemes/light.inc.css
+    /* schemes/light.inc.css now imported at top level (Chromium). */
   }
 }
 
-%include zen-buttons.css
+@import url('schemes/dark.inc.css');
+@import url('schemes/light.inc.css');
+@import url('zen-buttons.css');
+@import url('squircle-exclusions.inc.css');
+/* Chromium: relative imports (were %include). Scheme selection moves to
+   [zen-should-be-dark-mode] + prefers-color-scheme gates. */
 
-@media (-moz-pref('layout.css.corner-shape.enabled')) {
+/* was @media (-moz-pref('layout.css.corner-shape.enabled')) — corner-shape
+   support-gated on Chromium. */
+@media all {
   *:not(.no-squircles),
   .zen-squircle-before::before,
   .zen-squircle-after::after {
     corner-shape: superellipse(var(--zen-squircle-value));
   }
 
-%include squircle-exclusions.inc.css
+  /* squircle-exclusions.inc.css now imported at top level (Chromium). */
 }

@@ -6,7 +6,8 @@
 
 /** Zen Decks - ONLY USED FOR SPLIT VIEWS, DO NOT USE THIS CLASS FOR ANY OTHER PURPOSE **/
 
-%include zen-split-group.inc.css
+@import url('zen-split-group.inc.css');
+/* Chromium: relative import (was %include). */
 
 #tabbrowser-tabpanels[zen-split-view="true"] {
   display: flex;
@@ -41,7 +42,8 @@
 
   :root[inDOMFullscreen="true"] & {
     &:not(.deck-selected) {
-      -moz-subtree-hidden-only-visually: 1 !important;
+      /* was -moz-subtree-hidden-only-visually: 1 — Chromium: visibility handled by layout. */
+      visibility: hidden !important;
     }
 
     &.deck-selected {
@@ -126,7 +128,7 @@
 
 .zen-split-view-splitter {
   visibility: inherit;
-  -moz-subtree-hidden-only-visually: 0;
+  /* was -moz-subtree-hidden-only-visually: 0. */
   position: absolute;
   pointer-events: all;
 }
@@ -171,7 +173,7 @@
 
 .zen-view-splitter-header-container toolbarbutton {
   display: flex;
-  -moz-context-properties: fill, fill-opacity;
+  /* was -moz-context-properties: fill, fill-opacity. */
   border-radius: var(--tab-border-radius);
   color: contrast-color(var(--zen-active-split-outline-color));
   opacity: 0.8;

@@ -2,18 +2,19 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { parseXULFragment } from "../adapters/xul.mjs";
-import { getSelectedTab } from "../adapters/tabs.mjs";
-// Gecko now (gBrowser/PlacesUtils/TabStateCache/MigrationUtils below);
+import { parseXULFragment, insertFTLIfNeeded } from "../adapters/xul.mjs";
+import { getSelectedTabSync, addTab, setIcon } from "../adapters/tabs.mjs";
+import { recordHistoryVisit } from "../adapters/session.mjs";
+import { TabStateCache } from "resource:///modules/sessionstore/TabStateCache.sys.mjs";
+import { SearchService as SearchServiceModule } from "moz-src:///toolkit/components/search/SearchService.sys.mjs";
+// Gecko now (tab strip/Places utils/TabStateCache/MigrationUtils below);
 // Chromium: chrome.tabs/create, chrome.history, chrome.storage.session,
 // chrome.i18n — wire when surfer.json migration.engine === "chromium".
 
 {
-  let lazy = {};
-
-  ChromeUtils.defineESModuleGetters(lazy, {
-    SearchService: "moz-src:///toolkit/components/search/SearchService.sys.mjs",
-  });
+  const lazy = {
+    SearchService: SearchServiceModule,
+  };
 
   const kZenElementsToIgnore = [
     "zen-browser-background",
@@ -86,7 +87,7 @@ import { getSelectedTab } from "../adapters/tabs.mjs";
     const video = document.getElementById("zen-welcome-video");
     video.play().catch(() => {});
     // Gecko FTL loader; Chromium: chrome.i18n messages.
-    window.MozXULElement.insertFTLIfNeeded("browser/zen-welcome.ftl");
+    insertFTLIfNeeded("browser/zen-welcome.ftl");
   }
 
   var _iconToData = {};
@@ -338,8 +339,8 @@ import { getSelectedTab } from "../adapters/tabs.mjs";
     async #applyChoices() {
       await this.#pinEssentials();
       let tabsToGroup = [];
-      if (!getSelectedTab().hasAttribute("zen-empty-tab")) {
-        tabsToGroup.push(getSelectedTab());
+      if (!getSelectedTabSync().hasAttribute("zen-empty-tab")) {
+        tabsToGroup.push(getSelectedTabSync());
       }
       gZenFolders.createFolder(tabsToGroup, {
         renameFolder: false,
@@ -354,17 +355,11 @@ import { getSelectedTab } from "../adapters/tabs.mjs";
       if (!apps.length) {
         return;
       }
-      await PlacesUtils.history.insertMany(
-        apps.map(app => ({
-          url: app.url,
-          visits: [{ transition: PlacesUtils.history.TRANSITIONS.TYPED }],
-        }))
-      );
-      const { TabStateCache } = ChromeUtils.importESModule(
-        "resource:///modules/sessionstore/TabStateCache.sys.mjs"
-      );
       for (const app of apps) {
-        const tab = window.gBrowser.addTrustedTab(app.url, {
+        await recordHistoryVisit(app.url);
+      }
+      for (const app of apps) {
+        const tab = await addTab(app.url, {
           inBackground: true,
           createLazyBrowser: true,
         });
@@ -376,7 +371,7 @@ import { getSelectedTab } from "../adapters/tabs.mjs";
           history: { entries: [{ url: app.url }], index: 0 },
           image: icon,
         });
-        gBrowser.setIcon(tab, icon);
+        await setIcon(tab, icon);
         tab.removeAttribute("pending"); // Make it appear loaded
         gZenPinnedTabManager.addToEssentials(tab);
       }

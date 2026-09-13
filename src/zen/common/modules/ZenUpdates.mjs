@@ -4,10 +4,12 @@
 
 import createSidebarNotification from "./ZenSidebarNotification.mjs";
 import {
-  getBoolPref,
-  getStringPref,
+  getBoolPrefSync,
+  getStringPrefSync,
+  getAppInfo,
   setStringPref,
 } from "../../adapters/prefs.mjs";
+import { notifyObservers } from "../../adapters/observers.mjs";
 // Gecko now; Chromium: chrome.storage.local — same adapter surface.
 
 const ZEN_UPDATE_PREF = "zen.updates.last-version";
@@ -16,17 +18,17 @@ const ZEN_UPDATE_SHOW = "zen.updates.show-update-notification";
 const ZEN_UPDATE_NOTIFICATION_TIMEOUT_MS = 15000;
 
 export default function checkForZenUpdates() {
-  const version = Services.appinfo.version;
-  const lastVersion = getStringPref(ZEN_UPDATE_PREF, "");
+  const version = getAppInfo().version;
+  const lastVersion = getStringPrefSync(ZEN_UPDATE_PREF, "");
   setStringPref(ZEN_UPDATE_PREF, version);
   if (
     version === lastVersion ||
     gZenUIManager.testingEnabled ||
-    !getBoolPref(ZEN_UPDATE_SHOW, true)
+    !getBoolPrefSync(ZEN_UPDATE_SHOW, true)
   ) {
     return;
   }
-  const updateUrl = getStringPref(
+  const updateUrl = getStringPrefSync(
     "app.releaseNotesURL.prompt",
     ""
   );
@@ -35,9 +37,7 @@ export default function checkForZenUpdates() {
     autoHideMs: ZEN_UPDATE_NOTIFICATION_TIMEOUT_MS,
     links: [
       {
-        url: Services.urlFormatter.formatURL(
-          updateUrl.replace("%VERSION%", version)
-        ),
+        url: updateUrl.replace("%VERSION%", version),
         l10nId: "zen-sidebar-notification-updated",
         special: true,
         icon: "chrome://browser/skin/zen-icons/sparkles.svg",
@@ -49,7 +49,7 @@ export default function checkForZenUpdates() {
       },
       {
         action: () => {
-          Services.obs.notifyObservers(window, "restart-in-safe-mode");
+          notifyObservers(window, "restart-in-safe-mode");
         },
         l10nId: "zen-sidebar-notification-restart-safe-mode",
         icon: "chrome://browser/skin/zen-icons/security-broken.svg",
@@ -60,9 +60,9 @@ export default function checkForZenUpdates() {
 }
 
 export async function createWindowUpdateAnimation() {
-  const appID = Services.appinfo.appBuildID;
+  const appID = getAppInfo().appBuildID;
   if (
-    getStringPref(ZEN_BUILD_ID_PREF, "") === appID ||
+    getStringPrefSync(ZEN_BUILD_ID_PREF, "") === appID ||
     gZenUIManager.testingEnabled
   ) {
     return;

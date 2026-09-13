@@ -12,7 +12,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  -moz-window-dragging: drag;
+  -webkit-app-region: drag; /* was -moz-window-dragging */
 }
 
 #zen-welcome {
@@ -97,13 +97,14 @@
 
 #zen-welcome-start {
   flex-direction: column;
-  -moz-window-dragging: drag;
+  -webkit-app-region: drag; /* was -moz-window-dragging */
 
   color: white;
 
   #zen-welcome-start-button {
     opacity: 0;
-    list-style-image: url(chrome://browser/skin/zen-icons/forward.svg);
+    list-style-image: url(../zen-icons/forward.svg);
+    /* Chromium: relative asset path (was chrome://...). */
     padding: 1em !important;
     min-width: 100px;
     background: rgb(62, 115, 62) !important;
@@ -133,7 +134,7 @@
     white-space: nowrap;
     /* Layered (transformed) glyphs are drawn with grayscale AA on macOS;
      * use it for the whole title so animating characters don't look bolder. */
-    -moz-osx-font-smoothing: grayscale;
+    -webkit-font-smoothing: antialiased; /* was -moz-osx-font-smoothing */
     transform: translateY(-5%);
 
     & > span {
@@ -149,7 +150,7 @@
 }
 
 #zen-welcome-pages {
-  -moz-window-dragging: no-drag;
+  -webkit-app-region: no-drag; /* was -moz-window-dragging */
   opacity: 0;
   display: none;
   justify-content: start;
@@ -202,9 +203,9 @@
       content: "";
       width: 16px;
       height: 16px;
-      background: url(chrome://browser/skin/zen-icons/back.svg) center / contain
+      background: url(../zen-icons/back.svg) center / contain
         no-repeat;
-      -moz-context-properties: fill;
+      /* was -moz-context-properties: fill (currentColor inheritance on Chromium). */
       fill: currentColor;
     }
 
@@ -260,7 +261,8 @@
       position: absolute;
       inset: 0;
       z-index: 0;
-      background-image: url(chrome://browser/content/zen-images/grain-bg.png);
+      background-image: url(../zen-images/grain-bg.png);
+      /* Chromium: relative asset path (was chrome://...). */
       opacity: 0.3;
       mix-blend-mode: overlay;
       pointer-events: none;

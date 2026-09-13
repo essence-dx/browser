@@ -3,16 +3,21 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { getIntPref } from "../adapters/prefs.mjs";
-// Gecko now (MozXULElement base + tab-strip cache below); Chromium:
-// HTMLElement base, no cache invalidation — see adapters/xul.mjs.
+import { getElementBase } from "../adapters/xul.mjs";
+import { invalidateCachedTabs } from "../adapters/tabs.mjs";
+// Dual-engine base + tab strip cache via adapters (see adapters/xul.mjs).
 
 const lazy = {};
 
-ChromeUtils.defineLazyGetter(lazy, "l10n", () => {
-  return new Localization(["browser/zen-workspaces.ftl"], true);
+Object.defineProperty(lazy, "l10n", {
+  configurable: true,
+  enumerable: true,
+  get() {
+    return new Localization(["browser/zen-workspaces.ftl"], true);
+  },
 });
 
-class nsZenWorkspaceCreation extends (window.MozXULElement ?? HTMLElement) {
+class nsZenWorkspaceCreation extends getElementBase() {
   #wasInCollapsedMode = false;
   #urlbarDimmed = false;
 
@@ -287,8 +292,9 @@ class nsZenWorkspaceCreation extends (window.MozXULElement ?? HTMLElement) {
     gZenWorkspaces._organizeWorkspaceStripLocations(workspace, true);
     gZenWorkspaces.updateTabsContainers();
 
-    // Gecko tab-strip cache; Chromium: no-op (tab list re-queried).
-    gBrowser.tabContainer._invalidateCachedTabs();
+    // Tab strip cache refreshes via the tabs adapter; on Chromium the tab
+    // list is re-queried so this is a no-op.
+    invalidateCachedTabs();
   }
 
   async onCancelButtonCommand() {

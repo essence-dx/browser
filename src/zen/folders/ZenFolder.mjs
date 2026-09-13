@@ -2,16 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// Gecko now (MozTabbrowserTabGroup base + tab-group/tab APIs below);
-// Chromium: HTMLElement base + chrome.tabs/tabGroups — wire when
-// surfer.json migration.engine === "chromium". Live-folders manager import
-// is Lane 3's (see src/zen/live-folders).
+// Dual-engine folder base (see adapters); live-folders manager via static import.
+import { ZenLiveFoldersManager } from "../live-folders/ZenLiveFoldersManager.sys.mjs";
+import {
+  isTabGroup,
+  removeTab,
+  getTabForBrowser,
+} from "../adapters/tabs.mjs";
 
 const lazy = {};
-ChromeUtils.defineESModuleGetters(lazy, {
-  ZenLiveFoldersManager:
-    "resource:///modules/zen/ZenLiveFoldersManager.sys.mjs",
-});
+lazy.ZenLiveFoldersManager = ZenLiveFoldersManager;
 
 export class nsZenFolder extends MozTabbrowserTabGroup {
   #initialized = false;
@@ -106,7 +106,7 @@ export class nsZenFolder extends MozTabbrowserTabGroup {
    * @returns {MozTabbrowserTabGroup|null} The group this folder belongs to, or null if it is not part of a group.
    */
   get group() {
-    if (gBrowser.isTabGroup(this.parentElement?.parentElement)) {
+    if (isTabGroup(this.parentElement?.parentElement)) {
       return this.parentElement.parentElement;
     }
     return null;
@@ -167,11 +167,16 @@ export class nsZenFolder extends MozTabbrowserTabGroup {
   async unpackTabs() {
     this.collapsed = false;
     for (let tab of this.allItems.reverse()) {
-      tab = tab.group.hasAttribute("split-view-group") ? tab.group : tab;
+      tab = tab.group?.hasAttribute("split-view-group") ? tab.group : tab;
       if (tab.hasAttribute("zen-empty-tab")) {
-        gBrowser.removeTab(tab);
+        void removeTab(tab);
       } else {
-        gBrowser.ungroupTab(tab);
+        try {
+          this.before?.(tab);
+        } catch {}
+        try {
+          tab.group?.before(tab);
+        } catch {}
       }
     }
   }
@@ -179,12 +184,19 @@ export class nsZenFolder extends MozTabbrowserTabGroup {
   async delete() {
     for (const tab of this.allItemsRecursive) {
       if (tab.hasAttribute("zen-empty-tab")) {
-        // Manually remove the empty tabs as removeTabs() inside removeTabGroup
+        // Manually remove the empty tabs as removeTab inside removeTabGroup
         // does ignore them.
-        gBrowser.removeTab(tab);
+        void removeTab(tab);
       }
     }
-    await gBrowser.removeTabGroup(this, { isUserTriggered: true });
+    try {
+      for (const tab of [...this.allItems]) {
+        try {
+          this.before?.(tab);
+        } catch {}
+      }
+    } catch {}
+    this.remove();
   }
 
   get allItemsRecursive() {

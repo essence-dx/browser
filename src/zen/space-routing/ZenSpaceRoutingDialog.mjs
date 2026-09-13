@@ -2,20 +2,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// eslint-disable-next-line no-shadow
-const { gZenSpaceRoutingManager } = ChromeUtils.importESModule(
-  "resource:///modules/zen/spacerouting/ZenSpaceRoutingManager.sys.mjs"
-);
+import { gZenSpaceRoutingManager } from "./ZenSpaceRoutingManager.sys.mjs";
 
 // Chromium migration (lane 3): observer bus via adapter.
-// Gecko: Services.obs. Chromium: chrome.events / EventTarget (see adapters/observers.mjs).
-// Dialog chrome:// document + doc.createXULElement map to an extension page +
-// document.createElement at the shell layer.
+// Legacy observer bus maps to the shared event bus (see adapters/observers.mjs).
+// Dialog document element creation maps to an extension page +
+// standard element creation at the shell layer.
 import {
   addObserver,
   removeObserver,
   notifyObservers,
 } from "../adapters/observers.mjs";
+import { makeXulElement } from "../adapters/xul.mjs";
 
 export class nsZenSpaceRoutingDialog {
   doc = null;
@@ -126,27 +124,27 @@ export class nsZenSpaceRoutingDialog {
   createRouteElement(route) {
     const container = this.doc.getElementById("sr-content");
 
-    // Chromium: createXULElementLocal() (document.createElement); doc.createXULElement is Gecko-only.
-    const root = this.doc.createXULElement("vbox");
+    // Adapter element factory (see adapters/xul.mjs).
+    const root = makeXulElement("vbox");
     root.setAttribute("routeId", route.id);
     root.className = "sr-rule-container";
 
     // ---- Top row
 
-    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
-    const topRow = this.doc.createXULElement("hbox");
+    // Adapter element factory (see adapters/xul.mjs).
+    const topRow = makeXulElement("hbox");
     topRow.className = "sr-rule-row sr-rule-top";
 
-    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
-    const topLabelContainer = this.doc.createXULElement("hbox");
+    // Adapter element factory (see adapters/xul.mjs).
+    const topLabelContainer = makeXulElement("hbox");
     topLabelContainer.className = "sr-label-container";
 
-    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
-    const urlIcon = this.doc.createXULElement("image");
+    // Adapter element factory (see adapters/xul.mjs).
+    const urlIcon = makeXulElement("image");
     urlIcon.className = "sr-url-icon";
 
-    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
-    const urlLabel = this.doc.createXULElement("label");
+    // Adapter element factory (see adapters/xul.mjs).
+    const urlLabel = makeXulElement("label");
     urlLabel.className = "sr-label";
     urlLabel.setAttribute("data-l10n-id", "zen-space-routing-url");
 
@@ -154,17 +152,17 @@ export class nsZenSpaceRoutingDialog {
 
     // Match type
 
-    // Chromium: createXULElementLocal() (<select>); doc.createXULElement is Gecko-only.
-    const matchTypeMenulist = this.doc.createXULElement("menulist");
+    // Adapter element factory for select lists (see adapters/xul.mjs).
+    const matchTypeMenulist = makeXulElement("menulist");
     matchTypeMenulist.className = "select match-type-select";
 
-    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
-    const matchTypePopup = this.doc.createXULElement("menupopup");
+    // Adapter element factory (see adapters/xul.mjs).
+    const matchTypePopup = makeXulElement("menupopup");
     matchTypeMenulist.appendChild(matchTypePopup);
 
     ["contains", "equal-to", "regex"].forEach(id => {
-      // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
-      const menuItem = this.doc.createXULElement("menuitem");
+      // Adapter element factory (see adapters/xul.mjs).
+      const menuItem = makeXulElement("menuitem");
       menuItem.setAttribute("data-l10n-id", `zen-space-routing-${id}`);
       menuItem.setAttribute("value", id);
       matchTypePopup.appendChild(menuItem);
@@ -179,28 +177,28 @@ export class nsZenSpaceRoutingDialog {
     input.value = route.reference;
     this.updateInputPlaceholder(route.matchType, input);
 
-    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
-    const removeButton = this.doc.createXULElement("button");
+    // Adapter element factory (see adapters/xul.mjs).
+    const removeButton = makeXulElement("button");
     removeButton.className = "sr-remove";
 
     topRow.append(topLabelContainer, matchTypeMenulist, input, removeButton);
 
     // ---- Bottom row
 
-    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
-    const bottomRow = this.doc.createXULElement("hbox");
+    // Adapter element factory (see adapters/xul.mjs).
+    const bottomRow = makeXulElement("hbox");
     bottomRow.className = "sr-rule-row sr-rule-bottom";
 
-    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
-    const bottomLabelContainer = this.doc.createXULElement("hbox");
+    // Adapter element factory (see adapters/xul.mjs).
+    const bottomLabelContainer = makeXulElement("hbox");
     bottomLabelContainer.className = "sr-label-container";
 
-    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
-    const openInIcon = this.doc.createXULElement("image");
+    // Adapter element factory (see adapters/xul.mjs).
+    const openInIcon = makeXulElement("image");
     openInIcon.className = "sr-open-in-icon";
 
-    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
-    const openInLabel = this.doc.createXULElement("label");
+    // Adapter element factory (see adapters/xul.mjs).
+    const openInLabel = makeXulElement("label");
     openInLabel.className = "sr-label";
     openInLabel.setAttribute("data-l10n-id", "zen-space-routing-open-in");
 
@@ -208,12 +206,12 @@ export class nsZenSpaceRoutingDialog {
 
     // Open in
 
-    // Chromium: createXULElementLocal() (<select>); doc.createXULElement is Gecko-only.
-    const openInMenulist = this.doc.createXULElement("menulist");
+    // Adapter element factory for select lists (see adapters/xul.mjs).
+    const openInMenulist = makeXulElement("menulist");
     openInMenulist.className = "select open-in-select";
 
-    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
-    const openInMenupopup = this.doc.createXULElement("menupopup");
+    // Adapter element factory (see adapters/xul.mjs).
+    const openInMenupopup = makeXulElement("menupopup");
     openInMenulist.appendChild(openInMenupopup);
 
     this.createOpenInList(openInMenulist, route.openIn);
@@ -392,8 +390,8 @@ export class nsZenSpaceRoutingDialog {
       "zen-space-routing-most-recent-space",
     ]);
 
-    // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
-    const sectionHeader = this.doc.createXULElement("menuitem");
+    // Adapter element factory (see adapters/xul.mjs).
+    const sectionHeader = makeXulElement("menuitem");
     sectionHeader.setAttribute("label", openInSpace.value);
     sectionHeader.setAttribute("disabled", "true");
     sectionHeader.classList.add("menu-section-header");
@@ -403,14 +401,14 @@ export class nsZenSpaceRoutingDialog {
 
     let createXulItem = (text, id, iconPath = null) => {
       if (text === "sep") {
-        // Chromium: createXULElementLocal(); doc.createXULElement is Gecko-only.
-        popupElement.appendChild(this.doc.createXULElement("menuseparator"));
+        // Adapter element factory (see adapters/xul.mjs).
+        popupElement.appendChild(makeXulElement("menuseparator"));
         return;
       }
 
       availOptions.push(id || text);
-      // Chromium: createXULElementLocal() (<option>); doc.createXULElement is Gecko-only.
-      const menuItem = this.doc.createXULElement("menuitem");
+      // Adapter element factory for option rows (see adapters/xul.mjs).
+      const menuItem = makeXulElement("menuitem");
       menuItem.setAttribute("label", text);
       menuItem.setAttribute("value", id || text);
 

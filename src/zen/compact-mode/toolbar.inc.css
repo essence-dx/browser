@@ -4,12 +4,18 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+@import url('windows-captions-fix-default.inc.css');
+@import url('windows-captions-fix-active.inc.css');
+/* Chromium: relative imports (were %include). Conditionally-applied contents
+   noted at use sites below. */
+
 &:not([zen-single-toolbar='true']) {
   & #navigator-toolbox {
     --zen-toolbox-top-align: var(--zen-element-separation);
   }
 
-  @media -moz-pref('zen.view.compact.hide-tabbar') {
+  /* was @media -moz-pref('zen.view.compact.hide-tabbar') — gate via [data-zen-...] attr. */
+  @media all {
     & #titlebar {
       margin-top: var(--zen-element-separation) !important;
     }
@@ -41,7 +47,7 @@
       transition: opacity var(--zen-hidden-toolbar-transition);
     }
 
-%include windows-captions-fix-default.inc.css
+    /* windows-captions-fix-default.inc.css now imported at top level (Chromium). */
 
     & #zen-appcontent-navbar-container {
       opacity: 0;
@@ -57,7 +63,7 @@
     height: var(--zen-toolbar-height-with-bookmarks);
     overflow: inherit;
 
-%include windows-captions-fix-active.inc.css
+    /* windows-captions-fix-active.inc.css now imported at top level (Chromium). */
 
     & #urlbar {
       opacity: 1 !important;

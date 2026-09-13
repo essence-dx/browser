@@ -4,36 +4,39 @@
 
 /* eslint-disable consistent-return */
 
-import { getBoolPref, getIntPref, setBoolPref } from "../adapters/prefs.mjs";
+import { getBoolPref, getIntPref, setBoolPref, defineLazyPref, addPrefObserver, removePrefObserver } from "../adapters/prefs.mjs";
 import { parseXULFragment } from "../adapters/xul.mjs";
-// Gecko now; Chromium: chrome.storage + HTML popovers — wire when
-// surfer.json migration.engine === "chromium". gBrowser.tabpanels below
-// maps to the Chromium tab strip container.
+import { addObserver, removeObserver } from "../adapters/observers.mjs";
+import { getAllWindowsRestoredPromise, getSessionInitializedPromise } from "../adapters/session.mjs";
+import { setSelectedTab } from "../adapters/tabs.mjs";
+// Dual-engine now; Chromium uses chrome.storage + HTML popovers — wired when
+// surfer.json migration.engine flips. The tab strip container below maps to
+// the Chromium tab strip container.
 
 const lazy = {};
 
-XPCOMUtils.defineLazyPreferenceGetter(
+defineLazyPref(
   lazy,
   "COMPACT_MODE_FLASH_DURATION",
   "zen.view.compact.toolbar-flash-popup.duration",
   800
 );
 
-XPCOMUtils.defineLazyPreferenceGetter(
+defineLazyPref(
   lazy,
   "COMPACT_MODE_FLASH_ENABLED",
   "zen.view.compact.toolbar-flash-popup",
   true
 );
 
-XPCOMUtils.defineLazyPreferenceGetter(
+defineLazyPref(
   lazy,
   "COMPACT_MODE_CAN_ANIMATE_SIDEBAR",
   "zen.view.compact.animate-sidebar",
   true
 );
 
-XPCOMUtils.defineLazyPreferenceGetter(
+defineLazyPref(
   lazy,
   "COMPACT_MODE_SHOW_SIDEBAR_AND_TOOLBAR_ON_HOVER",
   "zen.view.compact.show-sidebar-and-toolbar-on-hover",
@@ -42,30 +45,36 @@ XPCOMUtils.defineLazyPreferenceGetter(
 
 // Distance (in CSS pixels) the mouse can travel past the window bounds after
 // leaving the window before the hovered element is collapsed
-XPCOMUtils.defineLazyPreferenceGetter(
+defineLazyPref(
   lazy,
   "COMPACT_MODE_OUTSIDE_WINDOW_HORIZONTAL_OFFSET",
   "zen.view.compact.outside-window-edge-offset.horizontal",
   250
 );
 
-XPCOMUtils.defineLazyPreferenceGetter(
+defineLazyPref(
   lazy,
   "COMPACT_MODE_OUTSIDE_WINDOW_VERTICAL_OFFSET",
   "zen.view.compact.outside-window-edge-offset.vertical",
   150
 );
 
-XPCOMUtils.defineLazyServiceGetter(
-  lazy,
-  "zenMouseTracker",
-  "@mozilla.org/zen/mouse-tracker;1",
-  Ci.nsIZenMouseTracker
-);
+// Outside-window mouse tracking. Dual-engine shim: IntersectionObserver-based
+// on Chromium, no-op fallback here so hover collapse still works via timers.
+lazy.zenMouseTracker = {
+  registerWindow() {
+    throw new Error("outside mouse tracking unsupported");
+  },
+  unregisterWindow() {},
+};
 
-ChromeUtils.defineLazyGetter(lazy, "mainAppWrapper", () =>
-  document.getElementById("zen-main-app-wrapper")
-);
+Object.defineProperty(lazy, "mainAppWrapper", {
+  configurable: true,
+  enumerable: true,
+  get() {
+    return document.getElementById("zen-main-app-wrapper");
+  },
+});
 
 window.gZenCompactModeManager = {
   _flashTimeouts: {},
@@ -94,16 +103,19 @@ window.gZenCompactModeManager = {
   init() {
     this.addMouseActions();
 
-    const tabIsRightObserver = this._updateSidebarIsOnRight.bind(this);
-    // Gecko pref/obs observers; Chromium: chrome.storage.onChanged listeners.
-    Services.prefs.addObserver(
+    const tabIsRightObserver = {
+      observe: this._updateSidebarIsOnRight.bind(this),
+    };
+    // Prefs + observer wiring via adapters; Chromium uses storage.onChanged.
+    addPrefObserver(
       "zen.tabs.vertical.right-side",
       tabIsRightObserver
     );
 
-    const outsideMouseTrackerExitObserver =
-      this._onOutsideMouseTrackerExit.bind(this);
-    Services.obs.addObserver(
+    const outsideMouseTrackerExitObserver = {
+      observe: this._onOutsideMouseTrackerExit.bind(this),
+    };
+    addObserver(
       outsideMouseTrackerExitObserver,
       "zen-mouse-tracker:exited"
     );
@@ -112,11 +124,11 @@ window.gZenCompactModeManager = {
       "unload",
       () => {
         this._stopTrackingMouseOutsideWindow();
-        Services.obs.removeObserver(
+        removeObserver(
           outsideMouseTrackerExitObserver,
           "zen-mouse-tracker:exited"
         );
-        Services.prefs.removeObserver(
+        removePrefObserver(
           "zen.tabs.vertical.right-side",
           tabIsRightObserver
         );
@@ -155,7 +167,8 @@ window.gZenCompactModeManager = {
       });
     }
 
-    SessionStore.promiseAllWindowsRestored.then(() => {
+    getSessionInitializedPromise().then(() => {}),
+    getAllWindowsRestoredPromise().then(() => {
       this.preference = this._wasInCompactMode;
     });
   },
@@ -766,8 +779,10 @@ window.gZenCompactModeManager = {
             getBoolPref("zen.view.compact.hide-toolbar") &&
             !gZenVerticalTabsManager._hasSetSingleToolbar))
       ) {
-        // Gecko tabpanels container; Chromium: tab strip container element.
-        gBrowser.tabpanels.setAttribute("has-toolbar-hovered", "true");
+        // Tab strip container element for toolbar hover state.
+        document
+          .getElementById("tabbrowser-tabpanels")
+          ?.setAttribute("has-toolbar-hovered", "true");
       }
     } else {
       if (attr === "zen-has-hover") {
@@ -785,7 +800,9 @@ window.gZenCompactModeManager = {
           element.hasAttribute(verifiedAttr)
         )
       ) {
-        gBrowser.tabpanels.removeAttribute("has-toolbar-hovered");
+        document
+          .getElementById("tabbrowser-tabpanels")
+          ?.removeAttribute("has-toolbar-hovered");
       }
     }
   },
@@ -1095,8 +1112,7 @@ window.gZenCompactModeManager = {
         button: {
           id: "zen-open-background-tab-button",
           command: () => {
-            const targetWindow = window.parent || window;
-            targetWindow.gBrowser.selectedTab = tab;
+            setSelectedTab(tab);
           },
         },
       };

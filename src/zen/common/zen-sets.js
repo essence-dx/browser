@@ -3,8 +3,16 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 // Gecko command set; Chromium: commands API + chrome.tabs/tabGroups.
-// gBrowser tab calls below map to Lane 2's tabs adapter (see
+// Tab calls below go through the tabs adapter (see
 // src/zen/adapters/tabs.mjs); live-folders import is Lane 3's.
+import { ZenLiveFoldersManager } from "../live-folders/ZenLiveFoldersManager.sys.mjs";
+import {
+  getSelectedTabSync,
+  getSelectedTabsSync,
+  pinTab,
+  unpinTab,
+  duplicateTab,
+} from "../adapters/tabs.mjs";
 
 document.addEventListener(
   "MozBeforeInitialXULLayout",
@@ -13,7 +21,7 @@ document.addEventListener(
     document
       .getElementById("zenCommandSet")
       // eslint-disable-next-line complexity
-      .addEventListener("command", event => {
+      .addEventListener("command", async event => {
         switch (event.target.id) {
           case "cmd_zenCompactModeToggle":
             gZenCompactModeManager.toggle();
@@ -52,7 +60,7 @@ document.addEventListener(
             gZenCommonActions.copyCurrentURLToClipboard();
             break;
           case "cmd_zenPinnedTabReset":
-            gZenPinnedTabManager.resetPinnedTab(gBrowser.selectedTab);
+            gZenPinnedTabManager.resetPinnedTab(getSelectedTabSync());
             break;
           case "cmd_zenPinnedTabResetNoTab":
             gZenPinnedTabManager.resetPinnedTab();
@@ -120,13 +128,13 @@ document.addEventListener(
             break;
           case "cmd_zenTogglePinTab": {
             const currentTab = gZenGlanceManager.getTabOrGlanceParent(
-              gBrowser.selectedTab
+              getSelectedTabSync()
             );
             if (currentTab && !currentTab.hasAttribute("zen-empty-tab")) {
               if (currentTab.pinned) {
-                gBrowser.unpinTab(currentTab);
+                await unpinTab(currentTab);
               } else {
-                gBrowser.pinTab(currentTab);
+                await pinTab(currentTab);
               }
             }
             break;
@@ -150,17 +158,13 @@ document.addEventListener(
             OpenBrowserWindow({ zenSyncedWindow: false });
             break;
           case "cmd_zenNewLiveFolder": {
-            const { ZenLiveFoldersManager } = ChromeUtils.importESModule(
-              "resource:///modules/zen/ZenLiveFoldersManager.sys.mjs"
-            );
             ZenLiveFoldersManager.handleEvent(event);
             break;
           }
           case "cmd_zenDuplicateTab": {
-            const selectedTabs = gBrowser.selectedTabs;
-            let insertAt = selectedTabs.at(-1)._tPos + 1;
+            const selectedTabs = getSelectedTabsSync();
             for (const tab of selectedTabs) {
-              gBrowser.duplicateTab(tab, true, { tabIndex: insertAt++ });
+              await duplicateTab(tab, true);
             }
             break;
           }

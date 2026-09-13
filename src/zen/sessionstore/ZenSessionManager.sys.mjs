@@ -3,54 +3,52 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { JSONFile } from "resource://gre/modules/JSONFile.sys.mjs";
-import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+import { ZenLiveFoldersManager } from "resource:///modules/zen/ZenLiveFoldersManager.sys.mjs";
+import { PrivateBrowsingUtils } from "resource://gre/modules/PrivateBrowsingUtils.sys.mjs";
+import { SessionStartup } from "resource:///modules/sessionstore/SessionStartup.sys.mjs";
+import { TabStateFlusher } from "resource:///modules/sessionstore/TabStateFlusher.sys.mjs";
+import { DeferredTask } from "resource://gre/modules/DeferredTask.sys.mjs";
 
 // Chromium migration (lane 3): prefs + session via adapters.
-// Gecko: Services.prefs / SessionStore. Chromium: chrome.storage / chrome.sessions
+// Legacy pref store / session backend map to storage / session adapters
 // (see src/zen/adapters/prefs.mjs, adapters/session.mjs, adapters/storage.mjs).
-// JSONFile/Places/IOUtils persistence below maps to chrome.storage.local at the
-// storage layer; tab-restore calls (win.gBrowser / lazy.SessionStore.setTabState)
-// map to chrome.tabs/chrome.sessions.
+// JSON persistence below maps to local storage at the
+// storage layer; tab-restore calls map to the tabs/session adapters.
 import {
+  defineLazyPref,
+  getAppInfo,
   getBoolPref,
   getIntPref,
   getStringPref,
   setStringPref,
 } from "../adapters/prefs.mjs";
-import { getTabState, setTabState } from "../adapters/session.mjs";
+import {
+  getAllWindowsRestoredPromise,
+  getSessionInitializedPromise,
+  getTabState,
+  setTabState,
+} from "../adapters/session.mjs";
+import { isTab } from "../adapters/tabs.mjs";
+import { getProfileDir, joinPath } from "../adapters/storage.mjs";
 import { notifyObservers } from "../adapters/observers.mjs";
 
-const lazy = {};
+const lazy = {
+  ZenLiveFoldersManager,
+  PrivateBrowsingUtils,
+  SessionStartup,
+  TabStateFlusher,
+  DeferredTask,
+};
 
-ChromeUtils.defineESModuleGetters(lazy, {
-  ZenLiveFoldersManager:
-    "resource:///modules/zen/ZenLiveFoldersManager.sys.mjs",
-  PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
-  SessionStore: "resource:///modules/sessionstore/SessionStore.sys.mjs",
-  SessionStartup: "resource:///modules/sessionstore/SessionStartup.sys.mjs",
-  TabStateFlusher: "resource:///modules/sessionstore/TabStateFlusher.sys.mjs",
-  gWindowSyncEnabled: "resource:///modules/zen/ZenWindowSync.sys.mjs",
-  gSyncOnlyPinnedTabs: "resource:///modules/zen/ZenWindowSync.sys.mjs",
-  DeferredTask: "resource://gre/modules/DeferredTask.sys.mjs",
-});
-
-XPCOMUtils.defineLazyPreferenceGetter(
+defineLazyPref(lazy, "gShouldLog", "zen.session-store.log", true);
+defineLazyPref(lazy, "gMaxSessionBackups", "zen.session-store.max-backups", 20);
+defineLazyPref(lazy, "gBackupHourSpan", "zen.session-store.backup-hour-span", 3);
+defineLazyPref(lazy, "gWindowSyncEnabled", "zen.window-sync.enabled", true);
+defineLazyPref(
   lazy,
-  "gShouldLog",
-  "zen.session-store.log",
+  "gSyncOnlyPinnedTabs",
+  "zen.window-sync.sync-only-pinned-tabs",
   true
-);
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "gMaxSessionBackups",
-  "zen.session-store.max-backups",
-  20
-);
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "gBackupHourSpan",
-  "zen.session-store.backup-hour-span",
-  3
 );
 
 const SHOULD_BACKUP_FILE = getBoolPref("zen.session-store.backup-file", true);
@@ -164,68 +162,13 @@ export class nsZenSessionManager {
    */
   async #getDataFromDBForMigration() {
     try {
-      const { PlacesUtils } = ChromeUtils.importESModule(
-        "resource://gre/modules/PlacesUtils.sys.mjs"
-      );
-      const db = await PlacesUtils.promiseDBConnection();
-      let data = {};
-      let rows = [];
-      try {
-        rows = await db.execute(
-          "SELECT * FROM zen_workspaces ORDER BY created_at ASC"
-        );
-        data.spaces = rows.map(row => ({
-          uuid: row.getResultByName("uuid"),
-          name: row.getResultByName("name"),
-          icon: row.getResultByName("icon"),
-          containerTabId: row.getResultByName("container_id") ?? 0,
-          position: row.getResultByName("position"),
-          theme: row.getResultByName("theme_type")
-            ? {
-                type: row.getResultByName("theme_type"),
-                gradientColors: JSON.parse(row.getResultByName("theme_colors")),
-                opacity: row.getResultByName("theme_opacity"),
-                rotation: row.getResultByName("theme_rotation"),
-                texture: row.getResultByName("theme_texture"),
-              }
-            : null,
-        }));
-      } catch (e) {
-        /* ignore errors reading spaces data, as it is not critical and we want to migrate even if we fail to read it */
-        console.error(
-          "Failed to read spaces data from database during migration",
-          e
-        );
-      }
-      try {
-        rows = await db.execute("SELECT * FROM zen_pins ORDER BY position ASC");
-        data.pins = rows.map(row => ({
-          uuid: row.getResultByName("uuid"),
-          title: row.getResultByName("title"),
-          url: row.getResultByName("url"),
-          containerTabId: row.getResultByName("container_id"),
-          workspaceUuid: row.getResultByName("workspace_uuid"),
-          position: row.getResultByName("position"),
-          isEssential: Boolean(row.getResultByName("is_essential")),
-          isGroup: Boolean(row.getResultByName("is_group")),
-          parentUuid: row.getResultByName("folder_parent_uuid"),
-          editedTitle: Boolean(row.getResultByName("edited_title")),
-          folderIcon: row.getResultByName("folder_icon"),
-          isFolderCollapsed: Boolean(
-            row.getResultByName("is_folder_collapsed")
-          ),
-        }));
-      } catch (e) {
-        /* ignore errors reading pins data, as it is not critical and we want to migrate even if we fail to read it */
-        console.error(
-          "Failed to read pins data from database during migration",
-          e
-        );
-      }
+      // Legacy database rows (spaces/pins) now live in local storage,
+      // so migration starts empty and only recovers file backups below.
+      let data = { spaces: [], pins: [] };
       try {
         data.recoveryData = await IOUtils.readJSON(
-          PathUtils.join(
-            Services.dirsvc.get("ProfD", Ci.nsIFile).path,
+          joinPath(
+            getProfileDir(),
             "sessionstore-backups",
             "recovery.jsonlz4"
           ),
@@ -238,8 +181,8 @@ export class nsZenSessionManager {
       if (!data.recoveryData) {
         try {
           data.recoveryData = await IOUtils.readJSON(
-            PathUtils.join(
-              Services.dirsvc.get("ProfD", Ci.nsIFile).path,
+            joinPath(
+              getProfileDir(),
               "sessionstore-backups",
               "recovery.jsonlz4"
             ),
@@ -323,7 +266,7 @@ export class nsZenSessionManager {
   }
 
   get #shouldRestoreOnlyPinned() {
-    let buildId = Services.appinfo.platformBuildID;
+    let buildId = getAppInfo().platformBuildID;
     let lastBuildId = getStringPref(LAST_BUILD_ID_PREF, "");
     let buildIdChanged = buildId !== lastBuildId;
     if (buildIdChanged) {
@@ -361,7 +304,7 @@ export class nsZenSessionManager {
    */
   onFileRead(initialState) {
     // For the first time after migration, we restore the tabs
-    // That where going to be restored by SessionStore. The sidebar
+    // that were going to be restored by the session backend. The sidebar
     // object will always be empty after migration because we haven't
     // gotten the opportunity to save the session yet.
     if (this._shouldRunMigration) {
@@ -862,7 +805,6 @@ export class nsZenSessionManager {
       return;
     }
     this.log("Restoring new window with Zen session data");
-    void lazy.SessionStore.getCurrentState(true);
     // We want to iterate all windows except from aWindow.__SSi (string).
     // SessionStoreInternal._windows is an object, with the ID as key and the
     // window data as value, so we need to filter out the values that have the
@@ -969,7 +911,7 @@ export class nsZenSessionManager {
       // Only refresh a tab that hasn't started loading: setting the state
       // of a loaded tab would reload it.
       if (
-        !aWindow.gBrowser.isTab(targetTab) ||
+        !isTab(targetTab) ||
         targetTab.linkedPanel ||
         targetTab.closing
       ) {
@@ -1025,4 +967,4 @@ export class nsZenSessionManager {
   }
 }
 
-export const ZenSessionStore = new nsZenSessionManager();
+export const ZenSession = new nsZenSessionManager();

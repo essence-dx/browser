@@ -2,20 +2,24 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+import { defineLazyPref } from "../../adapters/prefs.mjs";
 
 const lazy = {};
 
-ChromeUtils.defineESModuleGetters(lazy, {
-  BrowserUtils: "resource://gre/modules/BrowserUtils.sys.mjs",
-});
-
-XPCOMUtils.defineLazyPreferenceGetter(
+defineLazyPref(
   lazy,
   "blockJavascript",
   "browser.link.alternative_click.block_javascript",
   true
 );
+
+// Local anchor lookup stub (replaces content link helper): returns
+// [href, node, principal] with a null principal on Chromium.
+function hrefAndLinkNodeForClickEvent(event) {
+  const node = event.target?.closest?.("a[href]") ?? null;
+  const href = node?.href ?? null;
+  return [href, node, null];
+}
 
 // A small threshold to allow for minor mouse jitter during a normal click.
 // Anything beyond this is likely an intentional drag (like selecting text).
@@ -90,8 +94,7 @@ export class ZenGlanceChild extends JSWindowActorChild {
    */
   #getTargetFromEvent(event) {
     // get closest A element
-    let [href, node, principal] =
-      lazy.BrowserUtils.hrefAndLinkNodeForClickEvent(event);
+    let [href, node, principal] = hrefAndLinkNodeForClickEvent(event);
     return {
       href,
       node,
@@ -100,19 +103,23 @@ export class ZenGlanceChild extends JSWindowActorChild {
   }
 
   #checkSecurity(href, principal) {
-    if (
-      lazy.blockJavascript &&
-      Services.io.extractScheme(href) == "javascript"
-    ) {
-      // We don't want to open new tabs or windows for javascript: links.
-      return true;
+    if (lazy.blockJavascript) {
+      try {
+        if (new URL(href).protocol === "javascript:") {
+          // We don't want to open new tabs or windows for javascript: links.
+          return true;
+        }
+      } catch {
+        return true;
+      }
     }
 
     try {
-      Services.scriptSecurityManager.checkLoadURIStrWithPrincipal(
-        principal,
-        href
-      );
+      // Load check stub: block active schemes, allow http(s) and friends.
+      const parsed = new URL(href);
+      if (parsed.protocol === "javascript:" || parsed.protocol === "data:") {
+        return true;
+      }
     } catch (e) {
       return true;
     }

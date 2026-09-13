@@ -7,13 +7,14 @@ import {
   getBoolPref,
   getIntPref,
   setIntPref,
+  getBoolPrefSync,
+  getIntPrefSync,
+  clearUserPref,
 } from "../adapters/prefs.mjs";
-import { createXULElementLocal } from "../adapters/xul.mjs";
+import { makeXulElement } from "../adapters/xul.mjs";
 
 function clearPref(key) {
-  try {
-    Services.prefs.clearUserPref(key);
-  } catch {}
+  void clearUserPref(key);
   // Chromium: chrome.storage.local.remove(key);
 }
 
@@ -461,12 +462,8 @@ class KeyShortcut {
   }
 
   toXHTMLElement(aWindow) {
-    let key;
-    if (typeof aWindow.document.createXULElement === "function") {
-      key = aWindow.document.createXULElement("key");
-    } else {
-      key = createXULElementLocal("key");
-    }
+    // Dual-engine XUL factory (see adapters/xul.mjs).
+    const key = makeXulElement("key");
     // Chromium: document.createElement("key");
     return this.replaceWithChild(key);
   }
@@ -1446,7 +1443,7 @@ window.gZenKeyboardShortcutsManager = {
         return existingKeyset;
       }
 
-      this._zenDevtoolsKeyset = createXULElementLocal("keyset");
+      this._zenDevtoolsKeyset = makeXulElement("keyset");
       // Chromium: document.createElement("keyset");
       this._zenDevtoolsKeyset.id = id;
 

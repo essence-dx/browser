@@ -5,15 +5,14 @@
 // Migration note (Lane 2): chrome:// + resource:// URLs below are Gecko module
 // paths; Chromium loads the same UI modules as extension pages/scripts via
 // chrome.runtime.getURL / import — see src/zen/adapters/*.mjs import targets.
+import { loadVendorScript } from "../adapters/xul.mjs";
+import { gZenSpaceRoutingManager as ZenSpaceRoutingManagerModule } from "../space-routing/ZenSpaceRoutingManager.sys.mjs";
 // prettier-ignore
 // eslint-disable-next-line no-lone-blocks
 {
-  ChromeUtils.defineESModuleGetters(this, {
-    gZenSpaceRoutingManager:
-      "resource:///modules/zen/spacerouting/ZenSpaceRoutingManager.sys.mjs",
-  });
+  globalThis.gZenSpaceRoutingManager = ZenSpaceRoutingManagerModule;
 
-  Services.scriptloader.loadSubScript("chrome://browser/content/zen-components/ZenSpaceBookmarksStorage.js", this);
+  loadVendorScript("chrome://browser/content/zen-components/ZenSpaceBookmarksStorage.js", globalThis);
 
   let scripts = [
     "chrome://browser/content/ZenStartup.mjs",
@@ -22,7 +21,7 @@
     "chrome://browser/content/ZenUIManager.mjs",
     "chrome://browser/content/zen-components/ZenMods.mjs",
     "chrome://browser/content/zen-components/ZenKeyboardShortcuts.mjs",
-    "chrome://browser/content/zen-components/ZenSessionStore.mjs",
+    "chrome://browser/content/zen-components/ZenSession.mjs",
     "chrome://browser/content/zen-components/ZenMediaController.mjs",
     "chrome://browser/content/zen-components/ZenGlanceManager.mjs",
     "chrome://browser/content/zen-components/ZenPinnedTabManager.mjs",
@@ -34,7 +33,8 @@
   ];
 
   for (let script of scripts) {
-    ChromeUtils.importESModule(script, { global: "current" });
+            // Was Chrome utils importESModule(script, { global: "current" }).
+    import(script);
   }
 
   let customZenElements = [
@@ -54,7 +54,8 @@
         customElements.setElementCreationCallback(
           tag,
           function customElementCreationCallback() {
-            ChromeUtils.importESModule(script, { global: "current" });
+    // Was Chrome utils importESModule(script, { global: "current" }).
+            import(script);
           }
         );
       }
@@ -62,5 +63,5 @@
     { once: true }
   );
 
-  Services.scriptloader.loadSubScript("chrome://browser/content/zen-components/ZenDragAndDrop.js", this);
+  loadVendorScript("chrome://browser/content/zen-components/ZenDragAndDrop.js", globalThis);
 }

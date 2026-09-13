@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import { nsZenDOMOperatedFeature } from "../modules/ZenCommonUtils.mjs";
-import { createXULElementLocal } from "../../adapters/xul.mjs";
+import { makeXulElement, loadVendorScript } from "../../adapters/xul.mjs";
 // Gecko now (toolbarbutton XUL); Chromium: HTML button — same adapter surface.
 
 // prettier-ignore
@@ -88,7 +88,7 @@ class nsZenEmojiPicker extends nsZenDOMOperatedFeature {
       return this._emojis;
     }
     const lazy = {};
-    Services.scriptloader.loadSubScript(
+    loadVendorScript(
       "chrome://browser/content/zen-components/ZenEmojisData.min.mjs",
       lazy
     );
@@ -180,7 +180,7 @@ class nsZenEmojiPicker extends nsZenDOMOperatedFeature {
     if (allowEmojis) {
       const emojiList = this.emojiList;
       for (const emoji of this.#emojis) {
-        const item = createXULElementLocal("toolbarbutton");
+        const item = makeXulElement("toolbarbutton");
         item.className = "toolbarbutton-1 zen-emojis-picker-emoji";
         item.setAttribute("label", emoji.emoji);
         item.setAttribute("tooltiptext", "");
@@ -192,7 +192,7 @@ class nsZenEmojiPicker extends nsZenDOMOperatedFeature {
     }
     const svgList = this.svgList;
     for (const icon of SVG_ICONS) {
-      const item = document.createXULElement("toolbarbutton");
+      const item = makeXulElement("toolbarbutton");
       item.className = "toolbarbutton-1 zen-emojis-picker-svg";
       item.setAttribute("label", icon);
       item.setAttribute("tooltiptext", "");

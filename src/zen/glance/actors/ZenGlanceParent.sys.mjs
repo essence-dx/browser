@@ -4,6 +4,8 @@
 
 /* eslint-disable consistent-return */
 
+import { getStringPrefSync } from "../../adapters/prefs.mjs";
+
 export class ZenGlanceParent extends JSWindowActorParent {
   constructor() {
     super();
@@ -12,7 +14,7 @@ export class ZenGlanceParent extends JSWindowActorParent {
   async receiveMessage(message) {
     switch (message.name) {
       case "ZenGlance:GetActivationMethod": {
-        return Services.prefs.getStringPref(
+        return getStringPrefSync(
           "zen.glance.activation-method",
           "ctrl"
         );

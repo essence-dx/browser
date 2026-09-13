@@ -2,12 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
-
 // Chromium migration (lane 3): learner persistence via prefs adapter.
-// Gecko: Services.prefs string pref. Chromium: chrome.storage.local
+// Legacy string pref maps to local storage
 // (see src/zen/adapters/prefs.mjs).
-import { getStringPref, setStringPref } from "../adapters/prefs.mjs";
+import {
+  addPrefObserver,
+  defineLazyPref,
+  getStringPref,
+  getStringPrefSync,
+  setStringPref,
+} from "../adapters/prefs.mjs";
 
 const lazy = {};
 
@@ -23,16 +27,20 @@ function addDataToLazy(data) {
   } catch {}
 }
 
-// Chromium: chrome.storage.onChanged; XPCOM lazy pref getter is Gecko-only.
-XPCOMUtils.defineLazyPreferenceGetter(
+// Chromium: storage onChanged; lazy pref getter is engine-only.
+defineLazyPref(
   lazy,
   "rawDatabase",
   "zen.urlbar.suggestions-learner",
-  DEFAULT_DB_DATA,
-  (_aPreference, _previousValue, newValue) => {
-    addDataToLazy(newValue);
-  }
+  DEFAULT_DB_DATA
 );
+addPrefObserver("zen.urlbar.suggestions-learner", {
+  observe() {
+    addDataToLazy(
+      getStringPrefSync("zen.urlbar.suggestions-learner", DEFAULT_DB_DATA)
+    );
+  },
+});
 
 /**
  * A class that manages the learning of URL bar results for commands,

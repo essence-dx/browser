@@ -10,9 +10,13 @@ import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
 
 const lazy = {};
 
-ChromeUtils.defineLazyGetter(lazy, "siblingElement", () => {
-  // All our notifications should be attached after the media controls toolbar
-  return document.getElementById("zen-media-controls-toolbar");
+Object.defineProperty(lazy, "siblingElement", {
+  configurable: true,
+  enumerable: true,
+  get: () => {
+    // All our notifications should be attached after the media controls toolbar
+    return document.getElementById("zen-media-controls-toolbar");
+  },
 });
 
 /**
@@ -124,8 +128,7 @@ class ZenSidebarNotification extends MozLitElement {
                   return;
                 }
                 window.openLinkIn(link.url, "tab", {
-                  triggeringPrincipal:
-                    Services.scriptSecurityManager.getSystemPrincipal(),
+                  triggeringPrincipal: null,
                   forceForeground: true,
                 });
                 this.remove();

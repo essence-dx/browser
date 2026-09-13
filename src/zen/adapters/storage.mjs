@@ -71,3 +71,28 @@ export async function removePath(path) {
   }
   return IOUtils.remove(path);
 }
+
+export async function readJSON(path, fallback = null) {
+  try {
+    const store = _chromiumStorage();
+    if (store) {
+      const val = (await store.get(path))[path];
+      if (val === undefined) {
+        return fallback;
+      }
+      return typeof val === "string" ? JSON.parse(val) : val;
+    }
+    const text = await IOUtils.readUTF8(path);
+    return JSON.parse(text);
+  } catch {
+    return fallback;
+  }
+}
+
+export async function writeJSON(path, data) {
+  const store = _chromiumStorage();
+  if (store) {
+    return store.set({ [path]: JSON.stringify(data) });
+  }
+  return IOUtils.writeUTF8(path, JSON.stringify(data));
+}

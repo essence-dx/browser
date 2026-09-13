@@ -25,7 +25,8 @@
 }
 
 /* stylelint-disable-next-line media-query-no-invalid */
-@media -moz-pref("zen.theme.disable-lightweight") {
+/* was @media -moz-pref("zen.theme.disable-lightweight") — gate via [data-zen-...] attr. */
+@media all {
   #customization-lwtheme-link {
     display: none !important;
   }
@@ -258,13 +259,14 @@
 
 #TabsToolbar {
   gap: var(--zen-toolbox-padding);
-  -moz-window-dragging: unset;
+  -webkit-app-region: no-drag; /* was -moz-window-dragging: unset */
 }
 
 /* Status panel */
 
 /* stylelint-disable-next-line media-query-no-invalid */
-@media (-moz-pref("zen.theme.styled-status-panel")) {
+/* was @media (-moz-pref("zen.theme.styled-status-panel")) — gate via [data-zen-...] attr. */
+@media all {
   #statuspanel {
     padding: 6px;
 
@@ -425,7 +427,7 @@
   border-radius: 8px;
   transform: scale(1);
 
-  -moz-context-properties: fill;
+  /* was -moz-context-properties: fill. */
   fill: white;
 
   &:active {
@@ -484,7 +486,7 @@
   }
 
   & image {
-    -moz-context-properties: fill;
+    /* was -moz-context-properties: fill. */
     z-index: 1;
   }
 
@@ -551,14 +553,16 @@
 }
 
 /* stylelint-disable-next-line media-query-no-invalid */
-@media -moz-pref("zen.theme.hide-unified-extensions-button") {
+/* was @media -moz-pref("zen.theme.hide-unified-extensions-button") — gate via [data-zen-...] attr. */
+@media all {
   #unified-extensions-button:not([showing]) {
     display: none !important;
   }
 }
 
 /* stylelint-disable-next-line media-query-no-invalid */
-@media not -moz-pref("zen.theme.hide-unified-extensions-button") {
+/* was @media not -moz-pref("zen.theme.hide-unified-extensions-button") — gate via [data-zen-...] attr. */
+@media all {
   #zen-site-data-section-addons {
     display: none;
   }
@@ -577,7 +581,7 @@
   & toolbarbutton {
     margin: 0;
     appearance: none;
-    -moz-context-properties: fill;
+    /* was -moz-context-properties: fill. */
     fill: currentColor;
     color: light-dark(rgba(0, 0, 0, 0.8), rgba(255, 255, 255, 0.8));
     width: var(--size-item-xlarge);
@@ -606,7 +610,8 @@
       height: 100%;
       will-change: transform;
 
-      @media (-moz-platform: macos) {
+      /* was @media (-moz-platform: macos) — gate via [data-platform="macos"]. */
+      @media all {
         background: linear-gradient(to bottom, light-dark(rgb(255, 255, 255), rgb(34, 34, 34)), light-dark(rgb(246, 246, 246), rgb(21, 21, 21)));
 
         box-shadow:
@@ -792,7 +797,8 @@
   }
 
   /* stylelint-disable-next-line media-query-no-invalid */
-  @media not -moz-pref("zen.view.enable-loading-indicator") {
+  /* was @media not -moz-pref("zen.view.enable-loading-indicator") — gate via [data-zen-...] attr. */
+  @media all {
     display: none;
   }
 

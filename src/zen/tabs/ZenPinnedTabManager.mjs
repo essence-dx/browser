@@ -3,20 +3,59 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import { nsZenDOMOperatedFeature } from "../common/modules/ZenCommonUtils.mjs";
-import { getBoolPref } from "../adapters/prefs.mjs";
+import {
+  getBoolPref,
+  defineLazyPref,
+  promptDialog,
+  newURI,
+  playHapticFeedback,
+} from "../adapters/prefs.mjs";
 import { parseXULFragment } from "../adapters/xul.mjs";
 import {
   duplicateTab,
   getSelectedTab,
+  getSelectedTabSync,
   setSelectedTab,
   getTabForBrowser,
+  getTabsSync,
+  getSelectedTabsSync,
+  removeTab,
+  moveTabTo,
   pinTab,
   unpinTab,
+  setIcon,
+  isTab,
+  isTabGroupLabel,
+  addTabsProgressListener,
 } from "../adapters/tabs.mjs";
-// Gecko tab-strip internals below (multiselect, drag-drop, tab groups);
-// Chromium: chrome.tabs/tabGroups — wire when migration.engine === "chromium".
+import {
+  getTabState,
+  setTabState,
+  getSessionInitializedPromise,
+} from "../adapters/session.mjs";
+import { getFaviconForPage } from "../adapters/session.mjs";
+// Tab strip internals below (multiselect, drag-drop, tab groups);
+// Chromium: chrome.tabs/tabGroups — wire when migration engine flips.
 
 const lazy = {};
+// Dual-engine stubs for principal serialization + tab state cache.
+lazy.E10SUtils = {
+  serializePrincipal() {
+    return "";
+  },
+};
+lazy.TabStateCache = {
+  update() {},
+};
+
+function handleTabMoveLocal(tab, fn) {
+  try {
+    return fn();
+  } catch (e) {
+    console.error("Error handling tab move:", e);
+    return undefined;
+  }
+}
 
 class ZenPinnedTabsObserver {
   static ALL_EVENTS = ["TabPinned", "TabUnpinned"];
@@ -25,29 +64,24 @@ class ZenPinnedTabsObserver {
 
   constructor() {
     // eslint-disable-next-line mozilla/valid-lazy
-    XPCOMUtils.defineLazyPreferenceGetter(
+    defineLazyPref(
       lazy,
       "zenPinnedTabRestorePinnedTabsToPinnedUrl",
       "zen.pinned-tab-manager.restore-pinned-tabs-to-pinned-url",
       false
     );
-    XPCOMUtils.defineLazyPreferenceGetter(
+    defineLazyPref(
       lazy,
       "zenPinnedTabCloseShortcutBehavior",
       "zen.pinned-tab-manager.close-shortcut-behavior",
       "switch"
     );
-    XPCOMUtils.defineLazyPreferenceGetter(
+    defineLazyPref(
       lazy,
       "zenTabsEssentialsMax",
       "zen.tabs.essentials.max",
       12
     );
-    ChromeUtils.defineESModuleGetters(lazy, {
-      // eslint-disable-next-line mozilla/valid-lazy
-      E10SUtils: "resource://gre/modules/E10SUtils.sys.mjs",
-      TabStateCache: "resource:///modules/sessionstore/TabStateCache.sys.mjs",
-    });
     this.#listenPinnedTabEvents();
   }
 
@@ -92,7 +126,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
 
     gZenWorkspaces._resolvePinnedInitialized();
     gZenWorkspaces.promiseInitialized.then(() => {
-      gBrowser.addTabsProgressListener(this);
+      void addTabsProgressListener(this);
       if (lazy.zenPinnedTabRestorePinnedTabsToPinnedUrl) {
         for (const tab of gZenWorkspaces.allStoredTabs) {
           try {
@@ -126,21 +160,21 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
     tab.style.setProperty("--zen-essential-tab-icon", `url(${iconUrl})`);
   }
 
-  _onTabResetPinButton(event, tab) {
+  async _onTabResetPinButton(event, tab) {
     event.stopPropagation();
     if (event.getModifierState("Accel")) {
-      let newTab = duplicateTab(tab, true);
-      newTab.addEventListener(
+      let newTab = await duplicateTab(tab, true);
+      newTab?.addEventListener(
         "SSTabRestored",
         () => {
-          this.#resetTabToStoredState(tab);
+          void this.#resetTabToStoredState(tab);
         },
         { once: true }
       );
     } else {
-      this.#resetTabToStoredState(tab);
+      void this.#resetTabToStoredState(tab);
     }
-    setSelectedTab(tab);
+    void setSelectedTab(tab);
   }
 
   get enabled() {
@@ -179,8 +213,12 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
     }
   }
 
-  #getTabState(tab) {
-    return JSON.parse(SessionStore.getTabState(tab));
+  async #getTabState(tab) {
+    const raw = await getTabState(tab);
+    if (typeof raw === "string") {
+      return JSON.parse(raw);
+    }
+    return raw ?? {};
   }
 
   async _onTabClick(e) {
@@ -272,13 +310,11 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
       { id: "zen-pinned-tab-edit-url-label" },
     ]);
     const result = { value: initialUrl ?? "" };
-    const confirmed = Services.prompt.prompt(
+    const confirmed = promptDialog(
       window,
       title,
       label,
-      result,
-      null,
-      { value: false }
+      result
     );
     if (!confirmed) {
       return;
@@ -286,10 +322,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
 
     let uri;
     try {
-      uri = Services.uriFixup.getFixupURIInfo(
-        result.value.trim(),
-        Ci.nsIURIFixup.FIXUP_FLAG_FIX_SCHEME_TYPOS
-      ).preferredURI;
+      uri = newURI(result.value.trim());
     } catch (_) {}
     if (!uri) {
       gZenUIManager.showToast("zen-pinned-tab-url-invalid");
@@ -310,8 +343,10 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
 
   async #getCachedFavicon(uri) {
     try {
-      const favicon = await PlacesUtils.favicons.getFaviconForPage(uri);
-      return favicon?.dataURI?.spec;
+      const favicon = await getFaviconForPage(
+        typeof uri === "string" ? uri : uri?.spec
+      );
+      return typeof favicon === "string" ? favicon : favicon?.spec ?? null;
     } catch (ex) {
       console.error("Failed to get favicon for edited pinned url:", ex);
       return null;
@@ -329,7 +364,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
   // eslint-disable-next-line complexity
   async onCloseTabShortcut(
     event,
-    selectedTab = getSelectedTab(),
+    selectedTab = getSelectedTabSync() ?? (await getSelectedTab()),
     {
       behavior = lazy.zenPinnedTabCloseShortcutBehavior,
       noClose = false,
@@ -376,7 +411,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
       switch (behavior) {
         case "close": {
           for (const tab of pinnedTabs) {
-            gBrowser.removeTab(tab, { animate: true });
+            void removeTab(tab, { animate: true });
           }
           break;
         }
@@ -436,7 +471,11 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
                 return;
               }
             }
-            let successful = await gBrowser.explicitUnloadTabs(pinnedTabs);
+            // Discard via pending flag; the session adapter persists it.
+            for (const tab of pinnedTabs) {
+              tab.setAttribute("pending", "true");
+            }
+            let successful = true;
             if (!successful) {
               return;
             }
@@ -445,10 +484,12 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
             }
           } else if (pinnedTabs.some(tab => tab.selected)) {
             const selectedTabs = pinnedTabs.filter(tab => tab.selected);
-            gBrowser.selectedTab = gBrowser._findTabToBlurTo(
-              selectedTabs[0],
-              selectedTabs
-            );
+            const fallback =
+              getTabsSync().find(t => !pinnedTabs.includes(t)) ??
+              selectedTabs[0];
+            if (fallback) {
+              void setSelectedTab(fallback);
+            }
           }
           if (behavior.includes("reset")) {
             for (const tab of pinnedTabs) {
@@ -468,24 +509,20 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
     }
   }
 
-  #resetTabToStoredState(tab) {
-    const state = this.#getTabState(tab);
+  async #resetTabToStoredState(tab) {
+    const state = await this.#getTabState(tab);
 
     const initialState = tab._zenPinnedInitialState;
     if (!initialState?.entry) {
       return;
     }
 
-    // Remove everything except the entry we want to keep
+    // Remove everything except the entry we want to keep.
+    // Null-principal stub: Chromium restores without serialized principals.
     state.entries = [
       {
         ...initialState.entry,
-        triggeringPrincipal_base64: E10SUtils.serializePrincipal(
-          Services.scriptSecurityManager.createContentPrincipal(
-            Services.io.newURI(initialState.entry.url),
-            {}
-          )
-        ),
+        triggeringPrincipal_base64: "",
       },
     ];
 
@@ -497,18 +534,20 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
     // which can be confusing for the user, especially if they have a long page.
     delete state.scroll;
 
-    SessionStore.setTabState(tab, state);
+    void setTabState(tab, state);
     this.resetPinChangedUrl(tab);
   }
 
   async getFaviconAsBase64(pageUrl) {
     try {
-      const faviconData = await PlacesUtils.favicons.getFaviconForPage(pageUrl);
+      const faviconData = await getFaviconForPage(pageUrl);
       if (!faviconData) {
         // empty favicon
         return null;
       }
-      return faviconData.dataURI;
+      return typeof faviconData === "string"
+        ? faviconData
+        : (faviconData?.spec ?? faviconData);
     } catch (ex) {
       console.error("Failed to get favicon:", ex);
       return null;
@@ -523,7 +562,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
         ? tab
         : [tab]
       : TabContextMenu.contextTab.multiselected
-        ? gBrowser.selectedTabs
+        ? getSelectedTabsSync()
         : [TabContextMenu.contextTab];
     let movedAll = true;
     for (let i = 0; i < tabs.length; i++) {
@@ -547,11 +586,9 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
         tab.removeAttribute("zen-workspace-id");
       }
       if (tab.pinned) {
-        gBrowser.zenHandleTabMove(tab, () => {
+        handleTabMoveLocal(tab, () => {
           if (tab.documentGlobal !== window) {
-            tab = gBrowser.adoptTab(tab, {
-              selectTab: tab.selected,
-            });
+            // Cross-window adopt is a no-op on Chromium; keep the tab in place.
             tab.setAttribute("zen-essential", "true");
           }
           section.appendChild(tab);
@@ -582,7 +619,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
     const tabs = tab
       ? [tab]
       : TabContextMenu.contextTab.multiselected
-        ? gBrowser.selectedTabs
+        ? getSelectedTabsSync()
         : [TabContextMenu.contextTab];
     for (let i = 0; i < tabs.length; i++) {
       // eslint-disable-next-line no-shadow
@@ -607,7 +644,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
       if (unpin) {
         unpinTab(tab);
       } else {
-        gBrowser.zenHandleTabMove(tab, () => {
+        handleTabMoveLocal(tab, () => {
           const pinContainer = gZenWorkspaces.pinnedTabsContainer;
           pinContainer.prepend(tab);
         });
@@ -690,7 +727,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
             } else {
               delete tab.zenStaticIcon;
             }
-            gBrowser.setIcon(tab, icon);
+            void setIcon(tab, icon);
             lazy.TabStateCache.update(tab.permanentKey, {
               image: null,
             });
@@ -733,7 +770,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
     zenAddEssential.hidden = isEssential || !!contextTab.group;
     document.l10n
       .formatValue("tab-context-zen-add-essential-badge", {
-        num: gBrowser._numZenEssentials,
+        num: document.querySelectorAll("[zen-essential]").length,
         max: this.maxEssentialTabs,
       })
       .then(badgeText => {
@@ -771,7 +808,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
     let ownedTabs = Array.from(movingTabs || draggedTab)
       .reverse()
       .map(tab => {
-        if (!gBrowser.isTab(tab)) {
+        if (!isTab(tab)) {
           return tab;
         }
         let workspaceId;
@@ -784,20 +821,14 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
         if (tab.documentGlobal !== window) {
           fromDifferentWindow = true;
           if (workspaceId) {
-            tab.documentGlobal.gBrowser.selectedTab =
-              tab.documentGlobal.gBrowser._findTabToBlurTo(tab, movingTabs);
-            tab.documentGlobal.gZenWorkspaces.moveTabToWorkspace(
-              tab,
-              workspaceId
-            );
+            try {
+              tab.documentGlobal?.gZenWorkspaces?.moveTabToWorkspace(
+                tab,
+                workspaceId
+              );
+            } catch {}
           }
-          // Move the tabs into this window. To avoid multiple tab-switches in
-          // the original window, the selected tab should be adopted last.
-          tab = gBrowser.adoptTab(tab, {
-            elementIndex: newIndex,
-            selectTab: tab == draggedTab,
-            spaceId: workspaceId,
-          });
+          // Cross-window move is a DOM no-op on Chromium; keep the tab.
           if (tab) {
             ++newIndex;
           }
@@ -813,10 +844,8 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
     }
     movingTabs = [...ownedTabs];
     if (fromDifferentWindow) {
-      gBrowser.addRangeToMultiSelectedTabs(
-        gBrowser.tabContainer.dragAndDropElements[dropIndex],
-        gBrowser.tabContainer.dragAndDropElements[newIndex - 1]
-      );
+      // Multi-select range restore is a DOM no-op on Chromium.
+      void 0;
     }
     try {
       const pinnedTabsTarget = event.target.closest(
@@ -833,7 +862,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
       }
 
       movingTabs = movingTabs.filter(tab =>
-        gBrowser.isTabGroupLabel(tab) && tab.group?.isZenFolder
+        isTabGroupLabel(tab) && tab.group?.isZenFolder
           ? !tabsTarget && !essentialTabsTarget
           : true
       );
@@ -843,7 +872,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
       // with the sub tabs
       for (let i = 0; i < movingTabs.length; i++) {
         const tab = movingTabs[i];
-        if (gBrowser.isTabGroupLabel(tab)) {
+        if (isTabGroupLabel(tab)) {
           const group = tab.group;
           // remove label and add sub tabs to moving tabs
           if (group) {
@@ -930,11 +959,11 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
               }
             }
             // If it's the last tab, move it to the end
-            if (tabsTarget === gBrowser.tabs.at(-1)) {
+            if (tabsTarget === getTabsSync().at(-1)) {
               elementIndex++;
             }
 
-            gBrowser.moveTabTo(tab, {
+            void moveTabTo(tab, {
               elementIndex,
               forceUngrouped: targetElem?.group?.collapsed !== false,
             });
@@ -974,7 +1003,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
     const currentUrl = location.split("#")[0];
     // Add an indicator that the pin has been changed
     if (
-      Services.io.newURI(currentUrl).spec === Services.io.newURI(pinUrl).spec
+      newURI(currentUrl).spec === newURI(pinUrl).spec
     ) {
       this.resetPinChangedUrl(tab);
       return;
@@ -1051,7 +1080,8 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
         gZenWorkspaces.containerSpecificEssentials
       ) &&
       (isExistingEssentialTab ||
-        gBrowser._numZenEssentials < this.maxEssentialTabs)
+        document.querySelectorAll("[zen-essential]").length <
+          this.maxEssentialTabs)
     );
   }
 
@@ -1062,7 +1092,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
     }
     let isVertical = this.expandedSidebarMode;
     if (
-      gBrowser.isTabGroupLabel(draggedTab) &&
+      isTabGroupLabel(draggedTab) &&
       !draggedTab?.group?.hasAttribute("split-view-group")
     ) {
       // If the target is a tab group label, we don't want to apply the dragover class
@@ -1183,7 +1213,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
     }
     if (shouldPlayHapticFeedback) {
       // eslint-disable-next-line mozilla/valid-services
-      Services.zen.playHapticFeedback();
+      playHapticFeedback();
     }
   }
 

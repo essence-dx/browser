@@ -5,13 +5,11 @@
 // Gecko: NetUtil channels + scriptSecurityManager principals + nsIHttpChannel.
 // Chromium: fetch() with cookies (see adapters/storage.mjs notes); channel
 // QueryInterface/Ci/Cr below stay until the fetch shell lands.
-const lazy = {};
-ChromeUtils.defineESModuleGetters(lazy, {
-  NetUtil: "resource://gre/modules/NetUtil.sys.mjs",
-  DeferredTask: "resource://gre/modules/DeferredTask.sys.mjs",
-  NetworkHelper:
-    "resource://devtools/shared/network-observer/NetworkHelper.sys.mjs",
-});
+import { NetUtil } from "resource://gre/modules/NetUtil.sys.mjs";
+import { DeferredTask } from "resource://gre/modules/DeferredTask.sys.mjs";
+import { NetworkHelper } from "resource://devtools/shared/network-observer/NetworkHelper.sys.mjs";
+
+const lazy = { NetUtil, DeferredTask, NetworkHelper };
 
 export class nsZenLiveFolderProvider {
   #task = null;
@@ -140,11 +138,8 @@ export class nsZenLiveFolderProvider {
         userContextId = space.containerTabId || 0;
       }
     }
-    // Chromium: fetch(); content principals + nsIContentPolicy are Gecko-only.
-    const principal = Services.scriptSecurityManager.createContentPrincipal(
-      uri,
-      { userContextId }
-    );
+    // Chromium: fetch(); content principals are Gecko-only (stubbed null).
+    const principal = null;
 
     const channel = lazy.NetUtil.newChannel({
       uri,

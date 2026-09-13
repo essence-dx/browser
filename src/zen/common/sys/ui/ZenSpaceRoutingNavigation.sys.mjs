@@ -3,7 +3,11 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import { ZenUIComponent } from "./ZenUIComponent.sys.mjs";
-import { setSelectedTab } from "../../../adapters/tabs.mjs";
+import {
+  setSelectedTab,
+  getTabForBrowser,
+  addTab,
+} from "../../../adapters/tabs.mjs";
 // Gecko now (tabbrowser addTab/routing below); Chromium: chrome.tabs.create +
 // tab-group routing — wire when migration.engine === "chromium".
 
@@ -27,7 +31,7 @@ export class ZenSpaceRoutingNavigation extends ZenUIComponent {
    * @param {nsIRequest} aRequest - The request driving the state change
    * @param {number} aStateFlags - The nsIWebProgressListener state flags
    */
-  onStateChange(aBrowser, aWebProgress, aRequest, aStateFlags) {
+  async onStateChange(aBrowser, aWebProgress, aRequest, aStateFlags) {
     const wpl = Ci.nsIWebProgressListener;
     if (
       !aWebProgress?.isTopLevel ||
@@ -64,8 +68,7 @@ export class ZenSpaceRoutingNavigation extends ZenUIComponent {
     }
 
     const win = this.window;
-    const gBrowser = win.gBrowser;
-    const tab = gBrowser.getTabForBrowser(aBrowser);
+    const tab = await getTabForBrowser(aBrowser);
     if (
       !tab ||
       tab.pinned ||
@@ -97,11 +100,11 @@ export class ZenSpaceRoutingNavigation extends ZenUIComponent {
     if (isInitialDocument) {
       const wasSelected = tab.selected;
       // Defer so we don't mutate the tab strip from inside a progress notification.
-      win.setTimeout(() => {
+      win.setTimeout(async () => {
         if (!tab.isConnected) {
           return;
         }
-        setSelectedTab(tab.owner);
+        await setSelectedTab(tab.owner);
         win.gZenWorkspaces.moveTabToWorkspace(tab, targetWorkspaceId);
         if (wasSelected) {
           const targetWorkspace =
@@ -134,14 +137,12 @@ export class ZenSpaceRoutingNavigation extends ZenUIComponent {
     // loadInfo isn't reachable on the remote request, so use the navigating
     // page as the triggering principal (correct for link clicks), with a null
     // principal as the safe last resort.
-    const principal =
-      aBrowser.contentPrincipal ||
-      Services.scriptSecurityManager.createNullPrincipal({});
+    const principal = aBrowser.contentPrincipal || null;
 
     // Defer so we don't mutate the tab strip from inside a progress notification.
-    // Gecko addTab; Chromium: chrome.tabs.create (routed to target space).
-    win.setTimeout(() => {
-      gBrowser.addTab(urlToOpen, {
+    // Tab creation lives in the tabs adapter (routed to the target space).
+    win.setTimeout(async () => {
+      await addTab(urlToOpen, {
         triggeringPrincipal: principal,
         ownerTab: tab.isConnected ? tab : null,
         // The user was actively navigating this tab, so follow the navigation

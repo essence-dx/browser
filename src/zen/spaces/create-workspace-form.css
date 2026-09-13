@@ -76,7 +76,7 @@ zen-workspace-creation {
             position: absolute;
             width: var(--size-item-small);
             height: var(--size-item-small);
-            -moz-context-properties: fill-opacity, fill;
+            /* was -moz-context-properties: fill-opacity, fill. */
             fill: currentColor;
           }
 

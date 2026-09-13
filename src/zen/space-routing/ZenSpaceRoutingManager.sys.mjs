@@ -4,10 +4,13 @@
 
 import { JSONFile } from "resource://gre/modules/JSONFile.sys.mjs";
 
-// Chromium migration (lane 3): context-menu injection + dialog via xul/tabs adapters.
-// Gecko: window.MozXULElement / window.gBrowser / Services.wm / gDialogBox(chrome:// xhtml).
-// Chromium: parseXULFragment()/createXULElementLocal() + chrome.tabs + extension dialog page
+// Chromium migration (lane 3): context-menu injection + dialog via adapters.
+// Legacy element factory / tab strip / window lookup / dialog box map to
+// adapter factories + tabs/windows helpers + extension dialog page
 // (see src/zen/adapters/xul.mjs, adapters/tabs.mjs, adapters/windows.mjs).
+import { parseXULFragment } from "../adapters/xul.mjs";
+import { getSelectedTabsSync } from "../adapters/tabs.mjs";
+import { getTopWindow } from "../adapters/windows.mjs";
 
 class nsZenSpaceRoutingManager {
   #file = null;
@@ -29,8 +32,8 @@ class nsZenSpaceRoutingManager {
    * @param {nsIDOMWindow} window - The browser window that just started up
    */
   onDelayedBrowserStartup(window) {
-    // Chromium: parseXULFragment(); window.MozXULElement is Gecko-only.
-    const element = window.MozXULElement.parseXULToFragment(`
+    // Adapter fragment factory replaces the legacy element factory.
+    const element = parseXULFragment(`
         <menuseparator/>
         <menuitem id="context_zen-add-domain-to-routing"
                   data-l10n-id="tab-context-zen-add-domain-to-sr"
@@ -56,11 +59,11 @@ class nsZenSpaceRoutingManager {
    * @param {Event} event - The event param
    */
   #updateTabCloseCountState(event) {
-    // Chromium: chrome.tabs.query({}); window.gBrowser.selectedTabs is Gecko-only.
+    // Adapter tab query replaces the legacy selected-tabs lookup.
     const window = event.target.documentGlobal;
     window.document.l10n.setArgs(
       window.document.getElementById("context_zen-add-domain-to-routing"),
-      { tabCount: window.gBrowser.selectedTabs.length }
+      { tabCount: getSelectedTabsSync().length }
     );
   }
 
@@ -70,10 +73,10 @@ class nsZenSpaceRoutingManager {
    * @param {Event} event - The event parameter
    */
   #onAddSelectedToRouting(event) {
-    // Chromium: chrome.tabs.query({highlighted:true}); window.gBrowser is Gecko-only.
+    // Adapter tab query replaces the legacy tab-strip lookup.
     const window = event.target.documentGlobal;
     const tabs = window.TabContextMenu.contextTab.multiselected
-      ? window.gBrowser.selectedTabs
+      ? getSelectedTabsSync()
       : [window.TabContextMenu.contextTab];
     this.addRouteForSelected(tabs, window);
   }
@@ -253,9 +256,8 @@ class nsZenSpaceRoutingManager {
           if (targetWorkspace) {
             workspaces.moveTabToWorkspace(newTab, targetWorkspace.uuid);
 
-            // Chromium: chrome.windows.getLastFocused(); Services.wm is Gecko-only.
-            const mostRecentWindow =
-              Services.wm.getMostRecentWindow("navigator:browser");
+            // Chromium: focused-window helper replaces the legacy lookup.
+            const mostRecentWindow = await getTopWindow();
             const isOriginatingWindow = win === mostRecentWindow;
             if (isOriginatingWindow) {
               win.gZenWorkspaces.lastSelectedWorkspaceTabs[

@@ -40,3 +40,62 @@ export function getAllWindowsRestoredPromise() {
   }
   return SessionStore.promiseAllWindowsRestored;
 }
+
+// ---- LANE2 extensions: init gate + tab history + favicons (dual-engine) ----
+
+export function getSessionInitializedPromise() {
+  if (_chromiumSession()) {
+    return Promise.resolve(true);
+  }
+  return SessionStore.promiseInitialized;
+}
+
+export async function recordHistoryVisit(url) {
+  if (_chromiumSession() && typeof chrome?.history !== "undefined") {
+    try {
+      return chrome.history.addUrl({ url });
+    } catch {
+      return undefined;
+    }
+  }
+  try {
+    return PlacesUtils.history.insert({
+      url,
+      visits: [{ transition: PlacesUtils.history.TRANSITIONS.TYPED }],
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+export async function getFaviconForPage(pageUrl) {
+  if (_chromiumSession()) {
+    try {
+      const tabs = await chrome.tabs.query({ url: pageUrl });
+      return tabs?.[0]?.favIconUrl ?? null;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const favicon = await PlacesUtils.favicons.getFaviconForPage(pageUrl);
+    return favicon?.dataURI?.spec ?? favicon?.dataURI ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function compareURLHost(a, b) {
+  if (_chromiumSession()) {
+    try {
+      return new URL(a).host === new URL(b).host;
+    } catch {
+      return false;
+    }
+  }
+  try {
+    return Services.io.newURI(a).host === Services.io.newURI(b).host;
+  } catch {
+    return false;
+  }
+}

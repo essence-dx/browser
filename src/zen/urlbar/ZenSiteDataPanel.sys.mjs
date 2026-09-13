@@ -2,27 +2,22 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
-
-// Chromium migration (lane 3): prefs + XUL + observers via adapters.
-// Gecko: Services.prefs / document.createXULElement / MozXULElement / Services.obs.
-// Chromium: chrome.storage / document.createElement / template.innerHTML / chrome.events
-// (see src/zen/adapters/prefs.mjs, adapters/xul.mjs, adapters/observers.mjs).
-// Tab/window calls (this.window.gBrowser.*) map to chrome.tabs at the shell layer.
+import { gZenBoostsManager } from "../boosts/ZenBoostsManager.sys.mjs";
 import { getBoolPref, setBoolPref } from "../adapters/prefs.mjs";
 import { addObserver, removeObserver } from "../adapters/observers.mjs";
+import { parseXULFragment } from "../adapters/xul.mjs";
+import {
+  getSelectedTab,
+  getSelectedBrowser,
+  getCurrentURI,
+} from "../adapters/tabs.mjs";
 
 const ADDONS_BUTTONS_HIDDEN = getBoolPref(
   "zen.theme.hide-unified-extensions-button",
   true
 );
 
-const lazy = {};
-
-ChromeUtils.defineESModuleGetters(lazy, {
-  FeatureCallout: "resource:///modules/asrouter/FeatureCallout.sys.mjs",
-  gZenBoostsManager: "resource:///modules/zen/boosts/ZenBoostsManager.sys.mjs",
-});
+const lazy = { gZenBoostsManager };
 
 export class nsZenSiteDataPanel {
   #iconMap = {
@@ -54,13 +49,11 @@ export class nsZenSiteDataPanel {
   }
 
   #init() {
-    // Add a new button to the urlbar popup
-    // Chromium: parseXULFragment() (template.innerHTML); MozXULElement is Gecko-only.
-    const button = this.window.MozXULElement.parseXULToFragment(`
-      <box id="zen-site-data-icon-button" role="button" align="center" class="identity-box-button" delegatesanchor="true">
-        <image />
-        <image class="zen-site-data-boost-animation" />
-      </box>
+    const button = parseXULFragment(`
+      <div id="zen-site-data-icon-button" role="button" class="identity-box-button">
+        <img />
+        <img class="zen-site-data-boost-animation" />
+      </div>
     `);
     this.anchor = button.querySelector("#zen-site-data-icon-button");
     this.document.getElementById("identity-icon-box").before(button);
@@ -110,13 +103,7 @@ export class nsZenSiteDataPanel {
 
   #initBrowserListeners() {
     addObserver(this, "zen-boosts-update");
-    this.window.gBrowser.addProgressListener({
-      onLocationChange: aWebProgress => {
-        if (aWebProgress.isTopLevel) {
-          this.checkIfTabIsBoosted();
-        }
-      },
-    });
+    this.window.addEventListener("pageshow", () => this.checkIfTabIsBoosted());
     this.window.addEventListener(
       "unload",
       () => {
@@ -134,16 +121,16 @@ export class nsZenSiteDataPanel {
     }
   }
 
-  #getCurrentDomain() {
+  async #getCurrentDomain() {
     try {
-      return this.window.gBrowser.currentURI.host;
+      return (await getCurrentURI(this.window))?.host ?? "";
     } catch {
       return "";
     }
   }
 
-  checkIfTabIsBoosted() {
-    const domain = this.#getCurrentDomain();
+  async checkIfTabIsBoosted() {
+    const domain = await this.#getCurrentDomain();
     const isBoosted = lazy.gZenBoostsManager.registeredBoostForDomain(domain);
     if (isBoosted) {
       this.anchor.setAttribute("boosting", "true");
@@ -160,15 +147,14 @@ export class nsZenSiteDataPanel {
     // This function is a bit out of place, but it's related enough to the panel
     // that it's easier to do it here than in a separate module.
     const container = this.document.getElementById("page-action-buttons");
-    // Chromium: parseXULFragment() (template.innerHTML); MozXULElement is Gecko-only.
-    const fragment = this.window.MozXULElement.parseXULToFragment(`
-      <hbox id="zen-copy-url-button"
+    const fragment = parseXULFragment(`
+      <div id="zen-copy-url-button"
             class="urlbar-page-action"
             role="button"
             data-l10n-id="zen-urlbar-copy-url-button"
             disabled="true">
-        <image class="urlbar-icon"/>
-      </hbox>
+        <img class="urlbar-icon"/>
+      </div>
     `);
     container.after(fragment);
 
@@ -180,17 +166,14 @@ export class nsZenSiteDataPanel {
       this.document.getElementById("cmd_zenCopyCurrentURL").doCommand();
     });
 
-    this.window.gBrowser.addProgressListener({
-      onLocationChange: (aWebProgress, aRequest, aLocation) => {
-        if (aWebProgress.isTopLevel) {
-          const disabled = !this.#canCopyUrl(aLocation);
-          if (disabled) {
-            aElement.setAttribute("disabled", true);
-          } else {
-            aElement.removeAttribute("disabled");
-          }
-        }
-      },
+    this.window.addEventListener("pageshow", async event => {
+      const url = event.target?.location?.href;
+      const disabled = !this.#canCopyUrl(url ? new URL(url) : null);
+      if (disabled) {
+        aElement.setAttribute("disabled", true);
+      } else {
+        aElement.removeAttribute("disabled");
+      }
     });
   }
 
@@ -250,9 +233,9 @@ export class nsZenSiteDataPanel {
     this.#setAddonsOverflow();
   }
 
-  #setSiteBoost() {
-    const domain = this.#getCurrentDomain();
-    const uri = this.window.gBrowser.currentURI;
+  async #setSiteBoost() {
+    const domain = await this.#getCurrentDomain();
+    const uri = await getCurrentURI(this.window);
     const canBoostSite = lazy.gZenBoostsManager.canBoostSite(uri);
 
     const list = this.document.getElementById("zen-site-data-boost-list");
@@ -317,8 +300,7 @@ export class nsZenSiteDataPanel {
     boost = null,
     enabled = false
   ) {
-    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
-    const container = this.document.createXULElement("hbox");
+        const container = this.document.createElement("div");
     container.classList.add("permission-popup-boost-item");
 
     container.setAttribute("align", "center");
@@ -331,8 +313,7 @@ export class nsZenSiteDataPanel {
       container.setAttribute("state", enabled ? "enabled" : "disabled");
     }
 
-    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
-    const img = this.document.createXULElement("toolbarbutton");
+        const img = this.document.createElement("button");
     img.classList.add(
       "permission-popup-boost-icon",
       "zen-site-data-boost-icon"
@@ -340,21 +321,18 @@ export class nsZenSiteDataPanel {
     img.setAttribute("closemenu", "none");
     img.classList.add(iconClass);
 
-    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
-    const labelContainer = this.document.createXULElement("vbox");
+        const labelContainer = this.document.createElement("div");
     labelContainer.setAttribute("flex", "1");
     labelContainer.setAttribute("align", "start");
     labelContainer.classList.add("permission-popup-boost-label-container");
 
-    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
-    const nameLabel = this.document.createXULElement("label");
+        const nameLabel = this.document.createElement("span");
     nameLabel.setAttribute("flex", "1");
     nameLabel.setAttribute("class", "permission-popup-boost-label");
     nameLabel.textContent = title || "";
     labelContainer.appendChild(nameLabel);
 
-    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
-    const stateLabel = this.document.createXULElement("label");
+        const stateLabel = this.document.createElement("span");
     stateLabel.setAttribute("class", "zen-permission-popup-boost-state-label");
     const stateLabelId = enabled
       ? "zen-site-data-protections-enabled"
@@ -368,8 +346,7 @@ export class nsZenSiteDataPanel {
     container.appendChild(labelContainer);
 
     if (boost) {
-      // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
-      const editorButton = this.document.createXULElement("toolbarbutton");
+            const editorButton = this.document.createElement("button");
       editorButton.setAttribute("data-action-id", "zen-site-data-edit-boost");
       editorButton.setAttribute("data-boost-id", boost.id);
       editorButton.classList.add("zen-permission-popup-boost-editor-button");
@@ -436,7 +413,7 @@ export class nsZenSiteDataPanel {
     }
     {
       const button = this.document.getElementById("zen-site-data-header-share");
-      if (this.#canCopyUrl(this.window.gBrowser.currentURI)) {
+      if (this.#canCopyUrl(await getCurrentURI(this.window))) {
         button.removeAttribute("disabled");
       } else {
         button.setAttribute("disabled", "true");
@@ -455,7 +432,7 @@ export class nsZenSiteDataPanel {
       return false;
     }
 
-    return uri.scheme.startsWith("http");
+    return (uri.scheme ?? uri.protocol ?? "").startsWith("http");
   }
 
   #resetSiteOptionsList() {
@@ -507,14 +484,14 @@ export class nsZenSiteDataPanel {
     button.setAttribute("identity", identity);
   }
 
-  #setSitePermissions() {
-    const { gBrowser, SitePermissions } = this.window;
+  async #setSitePermissions() {
+    const { SitePermissions } = this.window;
+    const browser = await getSelectedBrowser(this.window);
     const list = this.document.getElementById("zen-site-data-settings-list");
     const section = list.closest(".zen-site-data-section");
 
-    // show permission icons
     let permissions = SitePermissions.getAllPermissionDetailsForBrowser(
-      gBrowser.selectedBrowser
+      browser
     );
 
     // Don't display origin-keyed 3rdPartyStorage permissions that are covered by
@@ -540,15 +517,15 @@ export class nsZenSiteDataPanel {
         return true;
       }
       try {
-        let origin = Services.io.newURI(key);
-        let site = Services.eTLD.getSite(origin);
+        const site = new URL(key).hostname;
         return !thirdPartyStorageSites.has(site);
       } catch {
         return false;
       }
     });
 
-    this._sharingState = gBrowser.selectedTab._sharingState;
+    const tab = await getSelectedTab(this.window);
+    this._sharingState = tab?._sharingState;
 
     if (this._sharingState?.geo) {
       let geoPermission = permissions.find(perm => perm.id === "geo");
@@ -607,10 +584,11 @@ export class nsZenSiteDataPanel {
 
     // Add site protection permissions if needed.
     const { gProtectionsHandler } = this.window;
+    const currentURI = await getCurrentURI(this.window);
+    const scheme = currentURI?.scheme ?? currentURI?.protocol ?? "";
     if (
-      gBrowser.currentURI.schemeIs("http") ||
-      gBrowser.currentURI.schemeIs("https") ||
-      gBrowser.currentURI.schemeIs("ftp")
+      scheme.startsWith("http") ||
+      scheme === "ftp:"
     ) {
       permissions.push({
         id: "site-protection",
@@ -621,8 +599,7 @@ export class nsZenSiteDataPanel {
       });
     }
 
-    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
-    const separator = this.document.createXULElement("toolbarseparator");
+    const separator = this.document.createElement("hr");
     list.appendChild(separator);
     const settingElements = [];
     const crossSiteCookieElements = [];
@@ -691,8 +668,7 @@ export class nsZenSiteDataPanel {
     const isCrossSiteCookie = id === "3rdPartyStorage";
 
     // Create a permission item for the site data panel.
-    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
-    let container = this.document.createXULElement("hbox");
+        let container = this.document.createElement("div");
     const idNoSuffix = permission.id;
     container.classList.add(
       "permission-popup-permission-item",
@@ -706,8 +682,7 @@ export class nsZenSiteDataPanel {
       permission.state == SitePermissions.ALLOW ? "allow" : "block"
     );
 
-    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
-    let img = this.document.createXULElement("toolbarbutton");
+        let img = this.document.createElement("button");
     img.classList.add(
       "permission-popup-permission-icon",
       "zen-site-data-permission-icon"
@@ -717,15 +692,13 @@ export class nsZenSiteDataPanel {
       img.classList.add(`zen-permission-${this.#iconMap[id]}-icon`);
     }
 
-    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
-    let labelContainer = this.document.createXULElement("vbox");
+        let labelContainer = this.document.createElement("div");
     labelContainer.setAttribute("flex", "1");
     labelContainer.setAttribute("align", "start");
     labelContainer.classList.add("permission-popup-permission-label-container");
     labelContainer._permission = permission;
 
-    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
-    let nameLabel = this.document.createXULElement("label");
+        let nameLabel = this.document.createElement("span");
     nameLabel.setAttribute("flex", "1");
     nameLabel.setAttribute("class", "permission-popup-permission-label");
     if (isCrossSiteCookie) {
@@ -746,8 +719,7 @@ export class nsZenSiteDataPanel {
     }
     labelContainer.appendChild(nameLabel);
 
-    // Chromium: createXULElementLocal(); document.createXULElement is Gecko-only.
-    let stateLabel = this.document.createXULElement("label");
+        let stateLabel = this.document.createElement("span");
     stateLabel.setAttribute(
       "class",
       "zen-permission-popup-permission-state-label"
@@ -771,11 +743,7 @@ export class nsZenSiteDataPanel {
   }
 
   #openGetAddons() {
-    const { switchToTabHavingURI } = this.window;
-    let amoUrl = Services.urlFormatter.formatURLPref(
-      "extensions.getAddons.link.url"
-    );
-    switchToTabHavingURI(amoUrl, true);
+    this.window.open("https://addons.mozilla.org/", "_blank");
   }
 
   #onCommandEvent(event) {
@@ -790,10 +758,11 @@ export class nsZenSiteDataPanel {
         break;
       }
       case "zen-site-data-boost": {
-        const domain = this.#getCurrentDomain();
-        const uri = this.window.gBrowser.currentURI;
-        const boost = lazy.gZenBoostsManager.createNewBoost(domain);
-        lazy.gZenBoostsManager.openBoostWindow(this.window, boost, uri);
+        this.#getCurrentDomain().then(async domain => {
+          const uri = await getCurrentURI(this.window);
+          const boost = lazy.gZenBoostsManager.createNewBoost(domain);
+          lazy.gZenBoostsManager.openBoostWindow(this.window, boost, uri);
+        });
         break;
       }
       case "zen-site-data-actions": {
@@ -815,24 +784,15 @@ export class nsZenSiteDataPanel {
         break;
       }
       case "zen-site-data-header-share": {
-        /* eslint-disable mozilla/valid-services */
-        if (Services.zen.canShare()) {
-          const buttonRect = event.target.getBoundingClientRect();
-          const currentUrl = this.window.gBrowser.currentURI;
-          /* eslint-disable mozilla/valid-services */
-          Services.zen.share(
-            currentUrl,
-            "",
-            "",
-            buttonRect.left,
-            this.window.innerHeight - buttonRect.bottom,
-            buttonRect.width,
-            buttonRect.height
-          );
+        if (navigator.share) {
+          const currentUrl = await getCurrentURI(this.window);
+          navigator
+            .share({ url: currentUrl?.spec ?? currentUrl?.href ?? "" })
+            .catch(() => {});
         } else {
           this.window.gZenCommonActions.copyCurrentURLToClipboard();
         }
-        if (AppConstants.platform !== "macosx") {
+        if (navigator.userAgentData?.platform !== "macOS") {
           this.unifiedPanel.hidePopup();
         }
       }
@@ -840,7 +800,7 @@ export class nsZenSiteDataPanel {
   }
 
   #onPermissionClick(label) {
-    const { SitePermissions, gBrowser } = this.window;
+    const { SitePermissions } = this.window;
     const permission = label._permission;
 
     let newState;
@@ -864,8 +824,9 @@ export class nsZenSiteDataPanel {
         gProtectionsHandler.enableForCurrentPage();
       }
     } else {
+      const browser = await getSelectedBrowser(this.window);
       SitePermissions.setForPrincipal(
-        gBrowser.contentPrincipal,
+        browser?.contentPrincipal ?? null,
         permission.id,
         newState
       );
@@ -887,14 +848,14 @@ export class nsZenSiteDataPanel {
     }
   }
 
-  #onBoostClick(event) {
+  async #onBoostClick(event) {
     const target = event.target.closest("[data-action-id]");
     if (!target) {
       return;
     }
 
     const actionId = target.getAttribute("data-action-id");
-    const domain = this.#getCurrentDomain();
+    const domain = await this.#getCurrentDomain();
 
     switch (actionId) {
       case "zen-site-data-toggle-boost": {
@@ -906,7 +867,7 @@ export class nsZenSiteDataPanel {
       }
       case "zen-site-data-edit-boost": {
         const boostId = target.getAttribute("data-boost-id");
-        const uri = this.window.gBrowser.currentURI;
+        const uri = await getCurrentURI(this.window);
         const boost = lazy.gZenBoostsManager.loadBoostFromStore(
           domain,
           boostId
@@ -979,12 +940,12 @@ export class nsZenSiteDataPanel {
       return;
     }
     setBoolPref(kPref, false);
-    // Chromium: chrome.tabs.onActivated; window.gBrowser.selectedTab is Gecko-only.
-    const { gBrowser, gZenWorkspaces } = this.window;
+    const { gZenWorkspaces } = this.window;
     await gZenWorkspaces.promiseInitialized;
     await new Promise(resolve => {
-      const checkEmptyTab = () => {
-        if (!gBrowser.selectedTab.hasAttribute("zen-empty-tab")) {
+      const checkEmptyTab = async () => {
+        const tab = await getSelectedTab(this.window);
+        if (!tab?.hasAttribute("zen-empty-tab")) {
           resolve();
           return;
         }
@@ -994,11 +955,12 @@ export class nsZenSiteDataPanel {
       };
       checkEmptyTab();
     });
-    const callout = new lazy.FeatureCallout({
+    const browser = await getSelectedBrowser(this.window);
+    const callout = new this.window.FeatureCallout({
       win: this.window,
       location: "chrome",
       context: "chrome",
-      browser: gBrowser.selectedBrowser,
+      browser,
       theme: { preset: "chrome" },
     });
     this.window.setTimeout(() => {

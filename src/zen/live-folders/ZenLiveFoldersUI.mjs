@@ -2,16 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-const lazy = {};
-ChromeUtils.defineESModuleGetters(lazy, {
-  ZenLiveFoldersManager:
-    "resource:///modules/zen/ZenLiveFoldersManager.sys.mjs",
-});
+import { ZenLiveFoldersManager as ZenLiveFoldersManagerModule } from "resource:///modules/zen/ZenLiveFoldersManager.sys.mjs";
+
+const lazy = { ZenLiveFoldersManager: ZenLiveFoldersManagerModule };
 
 // Chromium migration (lane 3): XUL menu construction via xul adapter.
-// Gecko: document.createXULElement. Chromium: document.createElement with the
+// Gecko: XUL factory method. Chromium: document.createElement with the
 // same attributes (see src/zen/adapters/xul.mjs).
-import { createXULElementLocal } from "../adapters/xul.mjs";
+import { makeXulElement } from "../adapters/xul.mjs";
 
 class nsZenLiveFoldersUI {
   init() {
@@ -106,15 +104,15 @@ class nsZenLiveFoldersUI {
   #appendOptions(parentPopup, options, folderId) {
     for (const option of options) {
       if (option.type === "separator") {
-        parentPopup.appendChild(createXULElementLocal("menuseparator"));
+        parentPopup.appendChild(makeXulElement("menuseparator"));
         continue;
       }
 
       if (option.options) {
-        const menu = createXULElementLocal("menu");
+        const menu = makeXulElement("menu");
         this.#applyMenuItemAttributes(menu, option, folderId);
 
-        const subPopup = createXULElementLocal("menupopup");
+        const subPopup = makeXulElement("menupopup");
         this.#appendOptions(subPopup, option.options, folderId);
 
         menu.appendChild(subPopup);
@@ -122,7 +120,7 @@ class nsZenLiveFoldersUI {
         continue;
       }
 
-      const menuItem = createXULElementLocal("menuitem");
+      const menuItem = makeXulElement("menuitem");
       this.#applyMenuItemAttributes(menuItem, option, folderId);
 
       if (option.value !== undefined) {
@@ -210,8 +208,8 @@ class nsZenLiveFoldersUI {
       return "-";
     }
 
-    // Chromium: navigator.language; Services.locale is Gecko-only.
-    const rtf = new Intl.RelativeTimeFormat(Services.locale.appLocaleAsBCP47, {
+    // Chromium: navigator.language; the locale service is Gecko-only.
+    const rtf = new Intl.RelativeTimeFormat(navigator.language, {
       numeric: "auto",
     });
     const secondsDiff = (date - Date.now()) / 1000;

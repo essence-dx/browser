@@ -74,3 +74,180 @@ export async function getTabForBrowser(browser) {
   }
   return gBrowser.getTabForBrowser(browser);
 }
+
+// ---- LANE2 extensions: tab-strip internals (dual-engine, same pattern) ----
+
+export async function getSelectedTabs() {
+  const ct = _chromiumTabs();
+  if (ct) {
+    return ct.query({ currentWindow: true, highlighted: true });
+  }
+  return gBrowser.selectedTabs;
+}
+
+export async function removeTab(tab, options) {
+  const ct = _chromiumTabs();
+  if (ct && tab?.id !== undefined) {
+    return ct.remove(tab.id);
+  }
+  return gBrowser.removeTab(tab, options);
+}
+
+export async function addTab(url, options) {
+  const ct = _chromiumTabs();
+  if (ct) {
+    return ct.create({ url, active: !(options?.inBackground ?? false) });
+  }
+  return gBrowser.addTab(url, options);
+}
+
+export async function createTab(url, options) {
+  return addTab(url, options);
+}
+
+export async function moveTabTo(tab, options) {
+  const ct = _chromiumTabs();
+  if (ct && tab?.id !== undefined) {
+    return ct.move(tab.id, { index: options?.tabIndex ?? -1 });
+  }
+  return gBrowser.moveTabTo(tab, options);
+}
+
+export async function getTabContainer() {
+  const ct = _chromiumTabs();
+  if (ct) {
+    return null;
+  }
+  return gBrowser.tabContainer;
+}
+
+export async function getTabBox() {
+  const ct = _chromiumTabs();
+  if (ct) {
+    return null;
+  }
+  return gBrowser.tabbox;
+}
+
+export function isTab(el) {
+  try {
+    if (typeof gBrowser?.isTab === "function") {
+      return gBrowser.isTab(el);
+    }
+  } catch {}
+  // Chromium: tab-strip custom element check.
+  return !!el?.hasAttribute?.("zen-tab-id");
+}
+
+export function isTabGroup(el) {
+  try {
+    if (typeof gBrowser?.isTabGroup === "function") {
+      return gBrowser.isTabGroup(el);
+    }
+  } catch {}
+  return !!el?.hasAttribute?.("split-view-group");
+}
+
+export function isTabGroupLabel(el) {
+  try {
+    if (typeof gBrowser?.isTabGroupLabel === "function") {
+      return gBrowser.isTabGroupLabel(el);
+    }
+  } catch {}
+  return !!el?.classList?.contains("tab-group-label-container");
+}
+
+export async function addTabsProgressListener(listener) {
+  const ct = _chromiumTabs();
+  if (ct && typeof chrome?.tabs?.onUpdated?.addListener === "function") {
+    return chrome.tabs.onUpdated.addListener((id, info, tab) =>
+      listener?.onStateChange?.(tab)
+    );
+  }
+  return gBrowser.addTabsProgressListener(listener);
+}
+
+export async function setIcon(tab, icon) {
+  const ct = _chromiumTabs();
+  if (ct) {
+    return undefined;
+  }
+  return gBrowser.setIcon(tab, icon);
+}
+
+// ---- LANE2 sync variants: getters / field initializers can't await ----
+
+export function getTabsSync() {
+  if (_chromiumTabs()) {
+    return [];
+  }
+  try {
+    return gBrowser.tabs;
+  } catch {
+    return [];
+  }
+}
+
+export function getSelectedTabSync() {
+  if (_chromiumTabs()) {
+    return null;
+  }
+  try {
+    return gBrowser.selectedTab;
+  } catch {
+    return null;
+  }
+}
+
+export function getSelectedTabsSync() {
+  if (_chromiumTabs()) {
+    return [];
+  }
+  try {
+    return gBrowser.selectedTabs;
+  } catch {
+    return [];
+  }
+}
+
+export function getTabContainerSync() {
+  if (_chromiumTabs()) {
+    return null;
+  }
+  try {
+    return gBrowser.tabContainer;
+  } catch {
+    return null;
+  }
+}
+
+export function getTabBoxSync() {
+  if (_chromiumTabs()) {
+    return null;
+  }
+  try {
+    return gBrowser.tabbox;
+  } catch {
+    return null;
+  }
+}
+
+export function invalidateCachedTabs() {
+  if (_chromiumTabs()) {
+    return undefined;
+  }
+  try {
+    gBrowser.tabContainer._invalidateCachedTabs();
+  } catch {}
+  return undefined;
+}
+
+export function invalidateCachedVisibleTabs() {
+  if (_chromiumTabs()) {
+    return undefined;
+  }
+  try {
+    gBrowser.tabContainer._invalidateCachedVisibleTabs();
+  } catch {}
+  return undefined;
+}

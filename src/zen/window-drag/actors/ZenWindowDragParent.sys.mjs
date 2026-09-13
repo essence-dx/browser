@@ -2,22 +2,20 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
-
 // Chromium migration (lane 3): native window move via windows adapter.
-// Gecko: nsIZenDragAndDrop XPCOM + Services.obs. Chromium: chrome.windows drag
-// region / shell drag shim + chrome.events (see src/zen/adapters/observers.mjs).
+// Legacy native drag service + observer bus map to a shell drag shim +
+// shared event bus (see src/zen/adapters/observers.mjs).
 import { notifyObservers } from "../../adapters/observers.mjs";
 
-const lazy = {};
-
-// Chromium: XPCOM lazy service has no equivalent; shell provides a drag shim.
-XPCOMUtils.defineLazyServiceGetter(
-  lazy,
-  "zenDragAndDropService",
-  "@mozilla.org/zen/drag-and-drop;1",
-  Ci.nsIZenDragAndDrop
-);
+function beginNativeWindowMove(win) {
+  try {
+    Cc["@mozilla.org/zen/drag-and-drop;1"]
+      .getService(Ci.nsIZenDragAndDrop)
+      .beginNativeWindowMove(win);
+  } catch {
+    /* shell drag shim takes over where the native service is unavailable */
+  }
+}
 
 export class ZenWindowDragParent extends JSWindowActorParent {
   receiveMessage(message) {
@@ -36,7 +34,7 @@ export class ZenWindowDragParent extends JSWindowActorParent {
           notifyObservers(win, "zen-window-drag-started");
           break;
         }
-        lazy.zenDragAndDropService.beginNativeWindowMove(win);
+        beginNativeWindowMove(win);
         break;
       }
       case "ZenWindowDrag:IsSnapped": {

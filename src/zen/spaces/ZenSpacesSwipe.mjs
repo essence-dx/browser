@@ -7,12 +7,20 @@ import { getIntPref, setBoolPref } from "../adapters/prefs.mjs";
 
 const lazy = {};
 
-ChromeUtils.defineLazyGetter(lazy, "browserBackgroundElement", () => {
-  return document.getElementById("zen-browser-background");
+Object.defineProperty(lazy, "browserBackgroundElement", {
+  configurable: true,
+  enumerable: true,
+  get() {
+    return document.getElementById("zen-browser-background");
+  },
 });
 
-ChromeUtils.defineLazyGetter(lazy, "toolbarBackgroundElement", () => {
-  return document.getElementById("zen-toolbar-background");
+Object.defineProperty(lazy, "toolbarBackgroundElement", {
+  configurable: true,
+  enumerable: true,
+  get() {
+    return document.getElementById("zen-toolbar-background");
+  },
 });
 
 export class ZenSpacesSwipe {

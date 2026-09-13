@@ -5,19 +5,32 @@
 import { nsZenLiveFolderProvider } from "resource:///modules/zen/ZenLiveFolder.sys.mjs";
 
 // Chromium migration (lane 3): feed parse + favicon via fetch/DOM.
-// Gecko: Services.io.newURI + Places favicons + Services.prompt. Chromium: URL +
+// Gecko: URL parsing + Places utils favicons + prompt dialog. Chromium: URL +
 // favicon service / link-rel-icon + extension prompt (shell layer).
+import { getFaviconForPage } from "../../adapters/session.mjs";
+import { promptDialog } from "../../adapters/prefs.mjs";
 
 const lazy = {};
-ChromeUtils.defineESModuleGetters(lazy, {
-  PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
-});
 
-ChromeUtils.defineLazyGetter(
-  lazy,
-  "l10n",
-  () => new Localization(["browser/zen-live-folders.ftl"])
-);
+Object.defineProperty(lazy, "l10n", {
+  configurable: true,
+  enumerable: true,
+  get() {
+    let value;
+    try {
+      value = new Localization(["browser/zen-live-folders.ftl"]);
+    } catch {
+      value = { formatValues: async () => [""] };
+    }
+    Object.defineProperty(lazy, "l10n", {
+      value,
+      configurable: true,
+      writable: true,
+      enumerable: true,
+    });
+    return value;
+  },
+});
 
 export class nsRssLiveFolderProvider extends nsZenLiveFolderProvider {
   static type = "rss";
@@ -67,9 +80,9 @@ export class nsRssLiveFolderProvider extends nsZenLiveFolderProvider {
             return false;
           }
           try {
-            // Chromium: new URL(item.url); Services.io.newURI is Gecko-only.
-            const parsed = Services.io.newURI(item.url);
-            if (parsed.scheme !== "http" && parsed.scheme !== "https") {
+            // Chromium: new URL(item.url); direct URI parsing is Gecko-only.
+            const protocol = new URL(item.url).protocol;
+            if (protocol !== "http:" && protocol !== "https:") {
               return false;
             }
           } catch {
@@ -86,12 +99,10 @@ export class nsRssLiveFolderProvider extends nsZenLiveFolderProvider {
       for (let item of items) {
         if (item.url) {
           try {
-            // Chromium: new URL(item.url); Services.io.newURI is Gecko-only.
-            const url = Services.io.newURI(item.url);
-            const favicon =
-              await lazy.PlacesUtils.favicons.getFaviconForPage(url);
+            // Chromium: new URL(item.url); direct URI parsing is Gecko-only.
+            const favicon = await getFaviconForPage(item.url);
             item.icon =
-              favicon?.dataURI.spec ||
+              favicon ||
               this.manager.window.gZenEmojiPicker.getSVGURL("logo-rss.svg");
           } catch {
             // Ignore errors related to fetching favicons for individual items
@@ -215,15 +226,13 @@ export class nsRssLiveFolderProvider extends nsZenLiveFolderProvider {
         )?.trim() || "";
 
       const faviconPageUrl = feedLink ? new URL(feedLink, url).href : url;
-      // Chromium: favicon link-rel-icon lookup; Places favicons is Gecko-only.
-      let favicon = await lazy.PlacesUtils.favicons.getFaviconForPage(
-        Services.io.newURI(faviconPageUrl)
-      );
+      // Chromium: favicon link-rel-icon lookup; Places utils is Gecko-only.
+      let favicon = await getFaviconForPage(faviconPageUrl);
 
       return {
         label: title || "",
         icon:
-          favicon?.dataURI.spec ||
+          favicon ||
           window.gZenEmojiPicker.getSVGURL("logo-rss.svg"),
       };
     } catch (e) {
@@ -239,10 +248,8 @@ export class nsRssLiveFolderProvider extends nsZenLiveFolderProvider {
     const [prompt] = await lazy.l10n.formatValues([
       "zen-live-folder-rss-prompt-feed-url",
     ]);
-    // Chromium: extension prompt dialog; Services.prompt is Gecko-only.
-    const promptOk = Services.prompt.prompt(window, prompt, null, input, null, {
-      value: null,
-    });
+    // Chromium: extension prompt dialog; the prompt service is Gecko-only.
+    const promptOk = promptDialog(window, prompt, null, input);
 
     if (!promptOk) {
       return null;

@@ -47,19 +47,22 @@
     cursor: pointer;
     transition: height 0.15s ease-out;
 
-    &::-moz-range-track {
+    &::-webkit-slider-runnable-track {
+      /* was ::-moz-range-track. */
       background: var(--zen-toolbar-element-bg);
       border-radius: 999px;
       height: var(--progress-height);
     }
 
-    &::-moz-range-progress {
+    /* was ::-moz-range-progress — Chromium uses -webkit-slider-runnable-track fill. */
+    &::after {
       background: color-mix(in srgb, var(--zen-primary-color) 70%, light-dark(black, white) 30%);
       border-radius: 999px;
       height: var(--progress-height);
     }
 
-    &::-moz-range-thumb {
+    &::-webkit-slider-thumb {
+      /* was ::-moz-range-thumb. */
       background: color-mix(in srgb, var(--zen-primary-color) 70%, light-dark(black, white) 30%);
       border: none;
       width: calc(var(--progress-height) * 2);
@@ -70,7 +73,7 @@
       transition: transform 0.15s ease-out;
     }
 
-    &:hover::-moz-range-thumb {
+    &:hover::-webkit-slider-thumb {
       transform: scale(1);
     }
   }
@@ -138,9 +141,7 @@
   width: 100%;
   padding: 4px 6px;
   border-radius: var(--border-radius-medium);
-  @media (-moz-platform: macos) {
-    border-radius: calc(var(--border-radius-medium) - 2px);
-  }
+  /* was @media (-moz-platform: macos) — gate via [data-platform="macos"]. */
   outline: var(--zen-sidebar-notification-outline);
   outline-offset: -1.5px;
   box-shadow: var(--zen-sidebar-notification-shadow);
@@ -230,7 +231,8 @@
   & .zen-media-focus-button::after {
     content: "";
     position: absolute;
-    background: url("chrome://browser/content/zen-images/note-indicator.svg") no-repeat;
+    background: url("../zen-images/note-indicator.svg") no-repeat;
+    /* Chromium: relative asset path (was chrome://...). */
     top: -70%;
     left: 0;
     right: 0;
@@ -260,7 +262,9 @@
     position: relative;
 
     & image {
-      &:-moz-broken {
+      /* was &:-moz-broken (broken-image state) — Chromium: img:not([src]). */
+      &:not([src]),
+      &[src=""] {
         content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3C/svg%3E") !important;
         background: color-mix(in srgb, var(--zen-primary-color) 70%, transparent 30%);
       }

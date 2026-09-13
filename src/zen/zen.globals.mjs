@@ -30,7 +30,7 @@ export default [
   "gZenPinnedTabManager",
 
   "gZenEmojiPicker",
-  "gZenSessionStore",
+  "gZenSession",
   "gZenFolders",
   "gZenMediaController",
   "gZenGlanceManager",
@@ -111,7 +111,7 @@ export default [
   "PageProxyClickHandler",
   "OpenSearchManager",
   "SimpleGestureEvent",
-  "MozXULElement",
+  "HTMLElement",
   "TabContextMenu",
   "CreateContainerTabMenu",
   "FillHistoryMenu",

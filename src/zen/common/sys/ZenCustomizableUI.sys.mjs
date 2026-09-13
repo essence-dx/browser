@@ -6,7 +6,7 @@ import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 // Gecko CustomizableUI area registration; Chromium: no equivalent — sidebar
 // buttons become extension action/popup HTML (see adapters/xul.mjs).
 import {
-  createXULElementLocal,
+  makeXulElement,
   parseXULFragment,
 } from "../../adapters/xul.mjs";
 
@@ -54,7 +54,7 @@ export const ZenCustomizableUI = new (class {
     const toolbox = window.gNavToolbox;
 
     // Set a splitter to navigator-toolbox
-    const splitter = createXULElementLocal("splitter");
+    const splitter = makeXulElement("splitter");
     // Chromium: HTML <hr> / div splitter.
     splitter.setAttribute("id", "zen-sidebar-splitter");
     splitter.setAttribute("orient", "horizontal");

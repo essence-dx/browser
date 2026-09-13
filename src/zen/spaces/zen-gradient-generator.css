@@ -70,7 +70,8 @@
   gap: 1.5rem;
   padding: 0 var(--panel-padding);
 
-  @media (-moz-platform: macos) {
+  @media all {
+    /* was (-moz-platform: macos) — gate via [data-platform="macos"]. */
     gap: 2rem;
   }
 
@@ -83,9 +84,7 @@
     font-weight: 600;
     margin-inline: 0;
     margin-bottom: 2px;
-    @media (-moz-platform: macos) {
-      font-size: larger;
-    }
+    /* was @media (-moz-platform: macos) — gate via [data-platform="macos"]. */
   }
 }
 
@@ -224,7 +223,8 @@
   z-index: 2;
   padding: 0 5px;
 
-  &::-moz-range-thumb {
+  &::-webkit-slider-thumb {
+    /* was ::-moz-range-thumb — Chromium slider pseudo-element. */
     background: light-dark(black, white);
     border-radius: 999px;
     height: var(--zen-thumb-height);
@@ -236,16 +236,18 @@
     transition: transform 0.5s;
   }
 
-  &:hover::-moz-range-thumb {
+  &:hover::-webkit-slider-thumb {
     transform: scale(1.1);
   }
 
-  &::-moz-range-track {
+  &::-webkit-slider-runnable-track {
+    /* was ::-moz-range-track. */
     border-radius: 999px;
     height: 18px;
   }
 
-  &::-moz-range-progress {
+  /* was ::-moz-range-progress — Chromium uses -webkit-slider-runnable-track fill. */
+  &::after {
     background: transparent;
   }
 }
@@ -362,7 +364,8 @@
 }
 
 /* stylelint-disable-next-line media-query-no-invalid */
-@media not -moz-pref("zen.theme.gradient.show-custom-colors") {
+/* was @media not -moz-pref("zen.theme.gradient.show-custom-colors") — gate via [data-zen-...] attr. */
+@media not all {
   #PanelUI-zen-gradient-generator-custom-colors {
     display: none !important;
   }
@@ -373,10 +376,7 @@
   height: 5rem;
   position: relative;
 
-  @media (-moz-platform: macos) {
-    width: 6rem;
-    height: 6rem;
-  }
+  /* was @media (-moz-platform: macos) — gate via [data-platform="macos"]. */
 
   &::after {
     content: "";
@@ -395,7 +395,8 @@
   }
 
   &::before {
-    background-image: url(chrome://browser/content/zen-images/grain-bg.png);
+    background-image: url(../zen-images/grain-bg.png);
+    /* Chromium: relative asset path (was chrome://...). */
     opacity: var(--zen-grainy-background-opacity, 0);
     mix-blend-mode: hard-light;
     width: 60%;

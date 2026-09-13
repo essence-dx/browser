@@ -6,12 +6,14 @@
 
 @font-face {
   font-family: "Zen-Junicode";
-  src: url("chrome://browser/content/zen-fonts/JunicodeVF-Roman.woff2") format("woff2");
+  src: url("../../zen-fonts/JunicodeVF-Roman.woff2") format("woff2");
+  /* Chromium: relative font path (was chrome://...). */
 }
 
 @font-face {
   font-family: "Zen-Junicode-Italic";
-  src: url("chrome://browser/content/zen-fonts/JunicodeVF-Italic.woff2") format("woff2");
+  src: url("../../zen-fonts/JunicodeVF-Italic.woff2") format("woff2");
+  /* Chromium: relative font path (was chrome://...). */
 }
 
 .zen-branding-title {

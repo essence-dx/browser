@@ -2,28 +2,34 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
-
-// Chromium: chrome.storage pref + getComputedStyle/elementFromPoint hit-test
+// Chromium: storage-backed pref + computed-style/elementFromPoint hit-test
 // (see src/zen/adapters/prefs.mjs).
+import { defineLazyPref } from "../../adapters/prefs.mjs";
 
 const lazy = {};
 
-// Chromium: chrome.storage (getIntPref); XPCOM lazy pref/service are Gecko-only.
-XPCOMUtils.defineLazyPreferenceGetter(
+// Chromium: storage-backed pref replaces the legacy lazy pref.
+defineLazyPref(
   lazy,
   "dragRegionHeightPercentage",
   "zen.view.drag-window-from-content.height-percentage",
   10
 );
 
-// Chromium: DOM hit-test (getComputedStyle/elementFromPoint); XPCOM service is Gecko-only.
-XPCOMUtils.defineLazyServiceGetter(
-  lazy,
-  "zenWindowDragUtils",
-  "@mozilla.org/zen/window-drag-utils;1",
-  Ci.nsIZenWindowDragUtils
-);
+// Chromium: DOM hit-test replaces the native helper; the native service
+// below stays as a best-effort Gecko path with a DOM-only fallback.
+function getWindowDragUtils() {
+  try {
+    return Cc["@mozilla.org/zen/window-drag-utils;1"].getService(
+      Ci.nsIZenWindowDragUtils
+    );
+  } catch {
+    return {
+      isInteractiveCursor: () => false,
+      isInteractiveContent: () => false,
+    };
+  }
+}
 
 // Movement below this is considered a click, not a window drag. Fast
 // clicks commonly slide a few pixels (especially on trackpads), and once
@@ -275,7 +281,7 @@ export class ZenWindowDragChild extends JSWindowActorChild {
       }
     }
     // The effective cursor, resolved the same way it is shown to the user.
-    return lazy.zenWindowDragUtils.isInteractiveCursor(
+    return getWindowDragUtils().isInteractiveCursor(
       event.composedTarget,
       event.clientX,
       event.clientY
@@ -291,8 +297,8 @@ export class ZenWindowDragChild extends JSWindowActorChild {
   }
 
   #isInteractiveElement(element) {
-    // Gecko's own notion of interactive, editable or draggable content.
-    if (lazy.zenWindowDragUtils.isInteractiveContent(element)) {
+    // Engine notion of interactive, editable or draggable content.
+    if (getWindowDragUtils().isInteractiveContent(element)) {
       return true;
     }
     if (kAppContentTags.has(element.localName)) {

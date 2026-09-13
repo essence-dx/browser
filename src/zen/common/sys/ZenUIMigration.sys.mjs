@@ -4,55 +4,62 @@
 
 import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 import {
-  getBoolPref,
-  getIntPref,
-  getStringPref,
+  getBoolPrefSync,
+  getIntPrefSync,
+  getStringPrefSync,
   setBoolPref,
   setIntPref,
   setStringPref,
+  prefHasUserValue,
+  confirmDialog,
 } from "../../adapters/prefs.mjs";
 import { getAllWindowsRestoredPromise } from "../../adapters/session.mjs";
-// Gecko now (dirsvc/startup/prompt internals below stay Gecko); Chromium:
-// chrome.storage.local + chrome.tabs — same prefs/session adapter surface.
+import { getTopWindow } from "../../adapters/windows.mjs";
+import {
+  joinPath,
+  getProfileDir,
+  pathExists,
+} from "../../adapters/storage.mjs";
+// Profile/restart/prompt flows below go through the adapters (Gecko now,
+// Chromium via chrome.storage/windows/runtime) — same adapter surface.
 
-const lazy = {};
-
-ChromeUtils.defineESModuleGetters(lazy, {
-  SessionStore: "resource:///modules/sessionstore/SessionStore.sys.mjs",
-});
+// Session state (was a lazy system-module getter) now resolves through
+// adapters/session.mjs.
 
 class nsZenUIMigration {
   PREF_NAME = "zen.ui.migration.version";
   MIGRATION_VERSION = 7;
 
-  init(isNewProfile) {
+  async init(isNewProfile) {
     if (!isNewProfile) {
       try {
-        this._migrate();
+        await this._migrate();
       } catch (e) {
         console.error("ZenUIMigration: Error during migration", e);
       }
     }
     this.clearVariables();
     if (this.shouldRestart) {
-      Services.startup.quit(
-        Ci.nsIAppStartup.eAttemptQuit | Ci.nsIAppStartup.eRestart
-      );
+      // A restart applies pending migration prefs; on Chromium the runtime
+      // reloads instead (no-ops where the runtime API is unavailable).
+      try {
+        chrome?.runtime?.reload?.();
+      } catch {}
     }
   }
 
   get _migrationVersion() {
-    return getIntPref(this.PREF_NAME, 0);
+    return getIntPrefSync(this.PREF_NAME, 0);
   }
 
   set _migrationVersion(value) {
     setIntPref(this.PREF_NAME, value);
   }
 
-  _migrate() {
+  async _migrate() {
     for (let i = 0; i <= this.MIGRATION_VERSION; i++) {
       if (this._migrationVersion < i) {
-        this[`_migrateV${i}`]?.();
+        await this[`_migrateV${i}`]?.();
       }
     }
   }
@@ -61,30 +68,30 @@ class nsZenUIMigration {
     this._migrationVersion = this.MIGRATION_VERSION;
   }
 
-  _migrateV1() {
+  async _migrateV1() {
     // If there's an userChrome.css or userContent.css existing, we set
     // 'toolkit.legacyUserProfileCustomizations.stylesheets' back to true
     // We do this to avoid existing user stylesheets to be ignored
-    const profileDir = Services.dirsvc.get("ProfD", Ci.nsIFile);
-    const userChromeFile = profileDir.clone();
-    userChromeFile.append("chrome");
-    userChromeFile.append("userChrome.css");
-    const userContentFile = profileDir.clone();
-    userContentFile.append("chrome");
-    userContentFile.append("userContent.css");
+    const profileDir = getProfileDir();
+    const userChromeExists = await pathExists(
+      joinPath(profileDir, "chrome", "userChrome.css")
+    ).catch(() => false);
+    const userContentExists = await pathExists(
+      joinPath(profileDir, "chrome", "userContent.css")
+    ).catch(() => false);
     setBoolPref(
       "zen.workspaces.separate-essentials",
-      getBoolPref(
+      getBoolPrefSync(
         "zen.workspaces.container-specific-essentials-enabled",
         false
       )
     );
-    const theme = getIntPref(
+    const theme = getIntPrefSync(
       "layout.css.prefers-color-scheme.content-override",
       0
     );
     setIntPref("zen.view.window.scheme", theme);
-    if (userChromeFile.exists() || userContentFile.exists()) {
+    if (userChromeExists || userContentExists) {
       setBoolPref(
         "toolkit.legacyUserProfileCustomizations.stylesheets",
         true
@@ -104,7 +111,7 @@ class nsZenUIMigration {
 
   _migrateV3() {
     if (
-      getStringPref("zen.theme.accent-color", "")
+      getStringPrefSync("zen.theme.accent-color", "")
         .startsWith("system")
     ) {
       setStringPref("zen.theme.accent-color", "AccentColor");
@@ -115,7 +122,7 @@ class nsZenUIMigration {
     // Fix spelling mistake in preference name
     setBoolPref(
       "zen.theme.use-system-colors",
-      getBoolPref("zen.theme.use-sysyem-colors", false)
+      getBoolPrefSync("zen.theme.use-sysyem-colors", false)
     );
   }
 
@@ -124,10 +131,12 @@ class nsZenUIMigration {
   }
 
   _migrateV6() {
-    // Gecko session gate; Chromium: chrome.sessions — see adapters/session.mjs.
-    getAllWindowsRestoredPromise().then(() => {
-      // Gecko window/prompt flow below stays as-is for now.
-      const win = Services.wm.getMostRecentWindow("navigator:browser");
+    // Session gate lives in adapters/session.mjs (chrome.sessions on Chromium).
+    getAllWindowsRestoredPromise().then(async () => {
+      const win = await getTopWindow();
+      if (!win?.document) {
+        return;
+      }
       win.setTimeout(async () => {
         const [title, message, learnMore, accept] =
           await win.document.l10n.formatMessages([
@@ -137,21 +146,14 @@ class nsZenUIMigration {
             "zen-window-sync-migration-dialog-accept",
           ]);
 
-        // buttonPressed will be 0 for cancel, 1 for "more info"
-        let buttonPressed = Services.prompt.confirmEx(
+        // buttonPressed will be 0 for "Learn More", 1 for dismiss.
+        const buttonPressed = confirmDialog(
           win,
           title.value,
-          message.value,
-          Services.prompt.BUTTON_POS_0 *
-            Services.prompt.BUTTON_TITLE_IS_STRING +
-            Services.prompt.BUTTON_POS_1 *
-              Services.prompt.BUTTON_TITLE_IS_STRING,
-          learnMore.value,
-          accept.value,
-          null,
-          null,
-          {}
-        );
+          `${message.value}\n\n${learnMore.value}`
+        )
+          ? 0
+          : 1;
         // User has clicked on "Learn More"
         if (buttonPressed === 0) {
           win.openTrustedLinkIn(
@@ -166,10 +168,10 @@ class nsZenUIMigration {
   _migrateV7() {
     if (
       AppConstants.platform === "macosx" &&
-      Services.prefs.prefHasUserValue(
+      prefHasUserValue(
         "widget.macos.sidebar-blend-mode.behind-window"
       ) &&
-      !getBoolPref(
+      !getBoolPrefSync(
         "widget.macos.sidebar-blend-mode.behind-window"
       )
     ) {

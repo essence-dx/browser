@@ -32,7 +32,7 @@
 }
 
 #editBMPanel_namePicker {
-  width: -moz-available;
+  width: -webkit-fill-available;
 }
 
 label.editBMPanel_folderRow,
@@ -41,7 +41,7 @@ label.editBMPanel_nameRow {
 }
 
 hbox.editBMPanel_folderRow {
-  width: -moz-available;
+  width: -webkit-fill-available;
 }
 
 .zenEditBMPanel_fieldContainer:not(:first-child) {

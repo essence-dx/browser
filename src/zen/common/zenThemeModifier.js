@@ -11,13 +11,22 @@
  * FOR ANY WEBSITE THAT WOULD NEED TO USE THE ACCENT COLOR, ETC
  *
  * Migration note: classic script, so it cannot import adapters/prefs.mjs yet.
- * Services.prefs reads below map to getIntPref/getBoolPref/getStringPref
+ * Prefs reads below map to getIntPrefSync/getBoolPrefSync/getStringPrefSync
  * (see src/zen/adapters/prefs.mjs); convert to a module on Chromium.
  */
+import {
+  getBoolPrefSync,
+  getIntPrefSync,
+  getStringPrefSync,
+  addPrefObserver,
+  removePrefObserver,
+  getPlatform,
+} from "../adapters/prefs.mjs";
+import { getSelectedTabSync } from "../adapters/tabs.mjs";
 {
-  const { AppConstants } = ChromeUtils.importESModule(
-    "resource://gre/modules/AppConstants.sys.mjs"
-  );
+  const platform = getPlatform().toLowerCase();
+  const isMacOS = platform === "darwin" || platform === "macosx";
+  const isLinux = platform === "linux";
 
   const kZenThemePrefsList = [
     "zen.theme.accent-color",
@@ -53,7 +62,7 @@
       var handleEvent = this.handleEvent.bind(this);
       // Listen for changes in the accent color and border radius
       for (let pref of kZenThemePrefsList) {
-        Services.prefs.addObserver(pref, handleEvent);
+        addPrefObserver(pref, handleEvent);
       }
 
       // Add fullscreen listener to update the theme when going in and out of fullscreen
@@ -76,7 +85,7 @@
         "unload",
         () => {
           for (let pref of kZenThemePrefsList) {
-            Services.prefs.removeObserver(pref, handleEvent);
+            removePrefObserver(pref, handleEvent);
           }
           for (let eventName of eventsForSeparation) {
             window.removeEventListener(eventName, separationHandler, {
@@ -103,7 +112,7 @@
     },
 
     updateBorderRadius() {
-      const borderRadius = Services.prefs.getIntPref( // -> getIntPref (adapters/prefs.mjs); Chromium: chrome.storage.local
+      const borderRadius = getIntPrefSync(
         "zen.theme.border-radius",
         -1
       );
@@ -111,7 +120,7 @@
       // -1 is the default value, will use platform-native values
       // otherwise, use the custom value
       if (borderRadius == -1) {
-        if (AppConstants.platform == "macosx") {
+        if (isMacOS) {
           const targetRadius = window.matchMedia("(-moz-mac-tahoe-theme)")
             .matches
             ? 12
@@ -120,7 +129,7 @@
             "--zen-border-radius",
             targetRadius + "px"
           );
-        } else if (AppConstants.platform == "linux") {
+        } else if (isLinux) {
           // Linux uses GTK CSD titlebar radius, default to 8px
           document.documentElement.style.setProperty(
             "--zen-border-radius",
@@ -159,7 +168,7 @@
         !document
           .getElementById("tabbrowser-tabbox")
           ?.hasAttribute("zen-split-view") &&
-        Services.prefs.getBoolPref("zen.view.borderless-fullscreen", true) // -> getBoolPref (adapters/prefs.mjs); Chromium: chrome.storage.local
+        getBoolPrefSync("zen.view.borderless-fullscreen", true)
       ) {
         separation = 0;
       }
@@ -175,7 +184,7 @@
         document.documentElement.removeAttribute("zen-no-padding");
       }
       if (domFullscreen) {
-        const selectedBrowser = gBrowser.selectedBrowser;
+        const selectedBrowser = getSelectedTabSync()?.linkedBrowser;
         selectedBrowser.style.paddingRight = "0.5px";
         window.addEventListener(
           "MozAfterPaint",
@@ -189,7 +198,7 @@
 
     get elementSeparation() {
       return Math.min(
-        Services.prefs.getIntPref("zen.theme.content-element-separation"), // -> getIntPref (adapters/prefs.mjs)
+        getIntPrefSync("zen.theme.content-element-separation", 0),
         kZenMaxElementSeparation
       );
     },
@@ -198,8 +207,9 @@
      * Update the accent color.
      */
     updateAccentColor() {
-      const accentColor = Services.prefs.getStringPref( // -> getStringPref (adapters/prefs.mjs)
-        "zen.theme.accent-color"
+      const accentColor = getStringPrefSync(
+        "zen.theme.accent-color",
+        ""
       );
       document.documentElement.style.setProperty(
         "--zen-primary-color",
@@ -208,7 +218,7 @@
     },
   };
 
-  if (typeof Services !== "undefined") {
-    ZenThemeModifier.init();
-  }
+  // The prefs adapter works in every privileged UI context (Gecko now,
+  // Chromium via chrome.storage), so no capability guard is needed.
+  ZenThemeModifier.init();
 }

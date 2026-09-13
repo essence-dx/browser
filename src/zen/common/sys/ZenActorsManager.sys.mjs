@@ -4,7 +4,7 @@
 // Utility to register JSWindowActors
 
 import { ActorManagerParent } from "resource://gre/modules/ActorManagerParent.sys.mjs";
-import { getStringPref } from "../../adapters/prefs.mjs";
+import { getStringPrefSync, getAppInfo } from "../../adapters/prefs.mjs";
 // Gecko JSWindowActors (resource:// actors below); Chromium: content scripts
 // via chrome.scripting — Lane 3 migrates mods/; this registry maps there.
 
@@ -34,7 +34,7 @@ let JSWINDOWACTORS = {
     },
     safeForUntrustedWebProcess: true,
     matches: [
-      ...getStringPref("zen.injections.match-urls").split(","),
+      ...getStringPrefSync("zen.injections.match-urls").split(","),
       "about:preferences",
     ],
   },
@@ -81,7 +81,7 @@ let JSWINDOWACTORS = {
   },
 };
 
-if (!Services.appinfo.inSafeMode) {
+if (!getAppInfo().inSafeMode) {
   JSWINDOWACTORS.ZenBoosts = {
     parent: {
       esModuleURI: "resource:///actors/ZenBoostsParent.sys.mjs",

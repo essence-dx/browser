@@ -168,7 +168,7 @@ tab-group[split-view-group] .tabbrowser-tab {
 
 tab-group[split-view-group] .tab-group-label-container {
   position: absolute;
-  width: -moz-available;
+  width: -webkit-fill-available;
   height: 36px;
   visibility: hidden;
   padding: 0 !important;

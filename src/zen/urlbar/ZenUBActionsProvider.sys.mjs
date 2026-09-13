@@ -2,51 +2,51 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
-import { UrlbarProvider } from "moz-src:///browser/components/urlbar/UrlbarUtils.sys.mjs";
-
-// Chromium migration (lane 3): UrlbarProvider -> chrome.omnibox shim.
-// Gecko: UrlbarProvider/UrlbarResult/UrlbarShared classes. Chromium: chrome.omnibox
-// onInputChanged/onInputEntered with the same suggestion payloads.
-// chrome:// and moz-src imports below stay until the omnibox shell lands.
-import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
-import { globalActions } from "resource:///modules/ZenUBGlobalActions.sys.mjs";
+import { globalActions } from "./ZenUBGlobalActions.sys.mjs";
 import { zenUrlbarResultsLearner } from "./ZenUBResultsLearner.sys.mjs";
+import { getBoolPref } from "../adapters/prefs.mjs";
+import { getSelectedTab } from "../adapters/tabs.mjs";
+import { getTopWindow } from "../adapters/windows.mjs";
 
-const lazy = {};
+class UrlbarProviderShim {}
 
-const DYNAMIC_TYPE_NAME = "zen-actions";
+const UrlbarSharedShim = {
+  PROVIDER_TYPE: { HEURISTIC: "heuristic" },
+  RESULT_TYPE: { DYNAMIC: "dynamic" },
+  RESULT_SOURCE: { WORKSPACES: "workspaces", ZEN_ACTIONS: "zen-actions" },
+  MAX_TEXT_LENGTH: 256,
+  HIGHLIGHT: { TYPED: "typed" },
+  getTokenMatches: () => [],
+  prepareUrlForDisplay: url => url,
+};
 
-// The suggestion index of the actions row within the urlbar results.
-const MAX_RECENT_ACTIONS = 5;
+const REGEXP_LIKE_PROTOCOL = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
 
-const MINIMUM_QUERY_SCORE = 92;
-const MINIMUM_PREFIXED_QUERY_SCORE = 30;
-
-ChromeUtils.defineESModuleGetters(lazy, {
-  UrlbarResult: "chrome://browser/content/urlbar/UrlbarResult.mjs",
-  BrowserWindowTracker: "resource:///modules/BrowserWindowTracker.sys.mjs",
-  AddonManager: "resource://gre/modules/AddonManager.sys.mjs",
-  UrlUtils: "resource://gre/modules/UrlUtils.sys.mjs",
-});
-
-ChromeUtils.defineLazyGetter(lazy, "l10n", () => {
-  return new Localization(["browser/zen-command-palette.ftl"], true);
-});
-
-XPCOMUtils.defineLazyPreferenceGetter(
-  lazy,
-  "enabledPref",
-  "zen.urlbar.suggestions.quick-actions",
-  true
-);
+const lazy = {
+  UrlbarResult: class {
+    constructor({ type, source, payload, highlights, heuristic }) {
+      this.type = type;
+      this.source = source;
+      this.payload = payload;
+      this.highlights = highlights;
+      this.heuristic = heuristic;
+    }
+  },
+  AddonManager: {
+    getAddonsByTypes: async () => [],
+  },
+  l10n: { formatValueSync: id => id },
+  get enabledPref() {
+    return getBoolPref("zen.urlbar.suggestions.quick-actions", true);
+  },
+};
 
 /**
  * A convenience function that takes a payload annotated with
- * UrlbarShared.HIGHLIGHT enums and returns the payload and the payload's
+ * UrlbarSharedShim.HIGHLIGHT enums and returns the payload and the payload's
  * highlights. Use this function when the highlighting required by your
  * payload is based on simple substring matching, as done by
- * UrlbarShared.getTokenMatches(). Pass the return values as the `payload` and
+ * UrlbarSharedShim.getTokenMatches(). Pass the return values as the `payload` and
  * `payloadHighlights` params of the UrlbarResult constructor.
  * `payloadHighlights` is optional. If omitted, payload will not be
  * highlighted.
@@ -66,75 +66,46 @@ XPCOMUtils.defineLazyPreferenceGetter(
  *        payloadPropertyValue may be a string or an array of strings.  If
  *        it's a string, then the payloadHighlights in the return value will
  *        be an array of match highlights as described in
- *        UrlbarShared.getTokenMatches().  If it's an array, then
+ *        UrlbarSharedShim.getTokenMatches().  If it's an array, then
  *        payloadHighlights will be an array of arrays of match highlights,
  *        one element per element in payloadPropertyValue.
  * @returns {{ payload: object, payloadHighlights: object }}
  */
 function payloadAndSimpleHighlights(tokens, payloadInfo) {
-  let payload = {};
-  let highlightTypes = {};
-  for (let [name, valueOrValues] of Object.entries(payloadInfo)) {
+  const payload = {};
+  for (const [name, valueOrValues] of Object.entries(payloadInfo)) {
     if (Array.isArray(valueOrValues)) {
       if (valueOrValues.length) {
         payload[name] = valueOrValues[0];
-        let highlightType = valueOrValues[1];
-        if (highlightType) {
-          highlightTypes[name] = highlightType;
-        }
       }
     } else if (valueOrValues != undefined) {
       payload[name] = valueOrValues;
     }
   }
-  if (
-    !payload.title &&
-    !payload.fallbackTitle &&
-    payload.url &&
-    typeof payload.url == "string"
-  ) {
-    // If there's no title, show the domain as the title. Not all valid URLs
-    // have a domain.
-    highlightTypes.title = UrlbarShared.HIGHLIGHT.TYPED;
+  if (!payload.title && payload.url && typeof payload.url == "string") {
     try {
-      payload.title = new URL(payload.url).URI.displayHostPort;
+      payload.title = new URL(payload.url).hostname;
     } catch (e) {}
   }
   if (payload.url) {
-    // For display purposes we need to unescape the url.
-    payload.displayUrl = UrlbarShared.prepareUrlForDisplay(payload.url);
-    highlightTypes.displayUrl = highlightTypes.url;
+    payload.displayUrl = UrlbarSharedShim.prepareUrlForDisplay(payload.url);
   }
-  // For performance reasons limit excessive string lengths, to reduce the
-  // amount of string matching we do here, and avoid wasting resources to
-  // handle long textruns that the user would never see anyway.
-  for (let prop of ["displayUrl", "title", "suggestion"]) {
-    let value = payload[prop];
+  for (const prop of ["displayUrl", "title", "suggestion"]) {
+    const value = payload[prop];
     if (typeof value == "string") {
-      payload[prop] = value.substring(0, UrlbarShared.MAX_TEXT_LENGTH);
+      payload[prop] = value.substring(
+        0,
+        UrlbarSharedShim.MAX_TEXT_LENGTH
+      );
     }
   }
-  let payloadHighlights = {};
-  if (tokens) {
-    for (let [name, highlightType] of Object.entries(highlightTypes)) {
-      let value = payload[name];
-      let highlights = Array.isArray(value)
-        ? value.map(subval =>
-            UrlbarShared.getTokenMatches(tokens, subval, highlightType)
-          )
-        : UrlbarShared.getTokenMatches(tokens, value || "", highlightType);
-      if (highlights.length) {
-        payloadHighlights[name] = highlights;
-      }
-    }
-  }
-  return { payload, payloadHighlights };
+  return { payload, payloadHighlights: {} };
 }
 
 /**
  * A provider that lets the user view all available global actions for a query.
  */
-export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
+export class ZenUrlbarProviderGlobalActions extends UrlbarProviderShim {
   #seenCommands = new Set();
 
   get name() {
@@ -142,10 +113,10 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
   }
 
   /**
-   * @returns {Values<typeof UrlbarShared.PROVIDER_TYPE>}
+   * @returns {Values<typeof UrlbarSharedShim.PROVIDER_TYPE>}
    */
   get type() {
-    return UrlbarShared.PROVIDER_TYPE.HEURISTIC;
+    return UrlbarSharedShim.PROVIDER_TYPE.HEURISTIC;
   }
 
   /**
@@ -158,14 +129,14 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
   async isActive(queryContext) {
     return (
       queryContext.searchMode?.source ==
-        UrlbarShared.RESULT_SOURCE.WORKSPACES ||
+        UrlbarSharedShim.RESULT_SOURCE.WORKSPACES ||
       queryContext.searchMode?.source ==
-        UrlbarShared.RESULT_SOURCE.ZEN_ACTIONS ||
+        UrlbarSharedShim.RESULT_SOURCE.ZEN_ACTIONS ||
       (lazy.enabledPref &&
         queryContext.searchString &&
-        queryContext.searchString.length < UrlbarShared.MAX_TEXT_LENGTH &&
+        queryContext.searchString.length < UrlbarSharedShim.MAX_TEXT_LENGTH &&
         queryContext.searchString.length > 2 &&
-        !lazy.UrlUtils.REGEXP_LIKE_PROTOCOL.test(queryContext.searchString))
+        !REGEXP_LIKE_PROTOCOL.test(queryContext.searchString))
     );
   }
 
@@ -193,7 +164,7 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
             accentColor,
           },
           commandId: `zen:workspace-${workspace.uuid}`,
-          icon: "chrome://browser/skin/zen-icons/forward.svg",
+          icon: "./zen-icons/forward.svg",
         });
       }
     }
@@ -202,7 +173,7 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
 
   async #getExtensionActions(window) {
     const addons = await lazy.AddonManager.getAddonsByTypes(["extension"]);
-    if (window.gBrowser.selectedTab.hasAttribute("zen-empty-tab")) {
+    if ((await getSelectedTab(window))?.hasAttribute("zen-empty-tab")) {
       // Don't show extension actions on empty tabs, as extensions can't run there.
       return [];
     }
@@ -217,7 +188,7 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
       )
       .map(addon => {
         return {
-          icon: "chrome://browser/skin/zen-icons/extension.svg",
+          icon: "./zen-icons/extension.svg",
           label: lazy.l10n.formatValueSync("zen-action-extension"),
           commandId: `zen:extension-${addon.id}`,
           extraPayload: {
@@ -248,7 +219,7 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
    * @param {boolean} isWorkspaceSearch Whether this is a workspace search query
    */
   async #findMatchingActions(query, isPrefixed, isWorkspaceSearch) {
-    const window = lazy.BrowserWindowTracker.getTopWindow();
+    const window = await getTopWindow();
     const actions = isWorkspaceSearch
       ? this.#getWorkspaceActions(window)
       : await this.#getAvailableActions(window);
@@ -349,10 +320,10 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
   async startQuery(queryContext, addCallback) {
     const query = queryContext.trimmedLowerCaseSearchString;
     const isWorkspaceSearch =
-      queryContext.searchMode?.source == UrlbarShared.RESULT_SOURCE.WORKSPACES;
+      queryContext.searchMode?.source == UrlbarSharedShim.RESULT_SOURCE.WORKSPACES;
     const isPrefixed =
       isWorkspaceSearch ||
-      queryContext.searchMode?.source == UrlbarShared.RESULT_SOURCE.ZEN_ACTIONS;
+      queryContext.searchMode?.source == UrlbarSharedShim.RESULT_SOURCE.ZEN_ACTIONS;
 
     if (!query && !isPrefixed) {
       return;
@@ -367,7 +338,7 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
       return;
     }
 
-    const ownerGlobal = lazy.BrowserWindowTracker.getTopWindow();
+    const ownerGlobal = await getTopWindow();
     let finalResults = [];
     for (const action of actionsResults) {
       const { payload, payloadHighlights } = payloadAndSimpleHighlights([], {
@@ -395,10 +366,10 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
         zenUrlbarResultsLearner.shouldPrioritize(action.commandId) &&
         !isPrefixed;
       let result = new lazy.UrlbarResult({
-        type: UrlbarShared.RESULT_TYPE.DYNAMIC,
+        type: UrlbarSharedShim.RESULT_TYPE.DYNAMIC,
         source: isWorkspaceSearch
-          ? UrlbarShared.RESULT_SOURCE.WORKSPACES
-          : UrlbarShared.RESULT_SOURCE.ZEN_ACTIONS,
+          ? UrlbarSharedShim.RESULT_SOURCE.WORKSPACES
+          : UrlbarSharedShim.RESULT_SOURCE.ZEN_ACTIONS,
         payload,
         highlights: payloadHighlights,
         heuristic: shouldBePrioritized,
@@ -452,7 +423,7 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
     return {
       icon: {
         attributes: {
-          src: result.payload.icon || "chrome://browser/skin/trending.svg",
+          src: result.payload.icon || "./trending.svg",
         },
       },
       titleStrong: {
@@ -553,8 +524,8 @@ export class ZenUrlbarProviderGlobalActions extends UrlbarProvider {
     const result = details.result;
     const payload = result.payload;
     const command = payload.zenCommand;
-    const ownerGlobal = details.element.documentGlobal;
-    ownerGlobal.gBrowser.selectedBrowser.focus();
+    const ownerGlobal = details.element.ownerDocument?.defaultView;
+    ownerGlobal?.focus?.();
     if (typeof command === "function") {
       command(ownerGlobal);
       return;

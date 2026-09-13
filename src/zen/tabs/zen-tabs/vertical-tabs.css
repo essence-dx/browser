@@ -30,8 +30,9 @@
    Single Toolbar Mode Specific Styles (`zen-single-toolbar='true'`)
    ========================================================================== */
 :root[zen-single-toolbar="true"] {
-  /* stylelint-disable-next-line media-query-no-invalid */
-  @media (-moz-platform: macos) and (not -moz-pref("zen.view.mac.show-three-dot-menu")) {
+  /* was: @media (-moz-platform: macos) and (not -moz-pref("zen.view.mac.show-three-dot-menu")).
+     Chromium: gate macOS via [data-platform="macos"] + [data-zen-view-mac-show-three-dot-menu]. */
+  @media all {
     &:not([customizing]) #PanelUI-button:not([open]):not([panelopen]) {
       position: absolute;
       opacity: 0;
@@ -54,7 +55,8 @@
    ========================================================================== */
 
 /* stylelint-disable-next-line media-query-no-invalid */
-@media -moz-pref("zen.tabs.vertical") {
+/* zen-pref gates below (-> @media all): JS sets :root[data-zen-...] attrs on Chromium. */
+@media all { /* was -moz-pref("zen.tabs.vertical") */
   :root:not([zen-window-buttons-reversed="true"]) {
     & .titlebar-buttonbox-container {
       margin-left: auto;
@@ -85,7 +87,8 @@
 
 #browser {
   --zen-min-toolbox-padding: 5px;
-  @media (-moz-platform: macos) {
+  @media all {
+    /* was (-moz-platform: macos) — gate via [data-platform="macos"]. */
     --zen-min-toolbox-padding: 6px;
   }
 
@@ -97,7 +100,7 @@
    ========================================================================== */
 :root[zen-single-toolbar="true"] {
   #urlbar-container {
-    width: -moz-available !important;
+    width: -webkit-fill-available !important;
   }
 
   /* stylelint-disable-next-line stylelint-plugin-mozilla/no-has-selector */
@@ -149,7 +152,8 @@
   opacity: 1;
   align-items: center;
 
-  @media (-moz-platform: macos) {
+  @media all {
+    /* was (-moz-platform: macos) — gate via [data-platform="macos"]. */
     padding: 0 5px;
   }
 
@@ -289,11 +293,13 @@
 
   --focus-outline-color: transparent;
 
-  @media (-moz-platform: windows) {
+  @media all {
+    /* was (-moz-platform: windows) — gate via [data-platform="windows"]. */
     font-size: 14px;
   }
 
-  @media (-moz-platform: macos) {
+  @media all {
+    /* was (-moz-platform: macos) — gate via [data-platform="macos"]. */
     font-size: 1.25rem;
   }
 
@@ -344,12 +350,13 @@
     }
 
     & .tab-icon-image {
-      -moz-context-properties: fill, stroke, fill-opacity;
+      /* -moz-context-properties -> currentColor inheritance on Chromium. */
       fill-opacity: 0.5;
       border-radius: 4px;
 
       &:not([src]),
-      &:-moz-broken {
+      &[src=""] {
+        /* was &:-moz-broken (broken-image state) — Chromium: img:not([src]). */
         content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3C/svg%3E") !important;
         background: color-mix(in srgb, var(--zen-primary-color) 80%, light-dark(rgb(0, 0, 0), rgb(255, 255, 255)));
         opacity: 0.5;
@@ -416,7 +423,8 @@
         position: absolute;
         width: 110%;
         height: 110%;
-      background: url("chrome://browser/content/zen-images/note-indicator.svg") no-repeat;
+      background: url("../zen-images/note-indicator.svg") no-repeat;
+      /* Chromium: relative asset path (was chrome://...). */
         top: -70%;
         left: 50%;
         transform: translateX(-50%);
@@ -632,7 +640,7 @@
 
       & .tab-background {
         margin-inline: var(--tab-margin-block);
-        width: -moz-available;
+        width: -webkit-fill-available;
       }
 
       /* --- Pinned Tab Icon Repositioning & Reset Button --- */
@@ -929,7 +937,7 @@
 .tab-reset-pin-button,
 .tab-close-button {
   display: none;
-  -moz-context-properties: fill, fill-opacity;
+  /* -moz-context-properties -> currentColor inheritance on Chromium. */
   border-radius: var(--tab-border-radius);
   color: inherit;
   fill: currentColor;
@@ -1027,7 +1035,8 @@
 
   :root[zen-single-toolbar="true"] & {
     --zen-toolbar-height: 36px;
-    @media (-moz-platform: macos) {
+    @media all {
+    /* was (-moz-platform: macos) — gate via [data-platform="macos"]. */
       --zen-toolbar-height: 38px;
     }
 
@@ -1060,11 +1069,12 @@
 #tabs-newtab-button {
   display: none;
   font-weight: 500;
-  -moz-user-focus: ignore !important;
+  /* was -moz-user-focus: ignore — Chromium: default focus behavior. */
 }
 
 /* stylelint-disable-next-line media-query-no-invalid */
-@media -moz-pref("zen.tabs.show-newtab-vertical") {
+/* was -moz-pref("zen.tabs.show-newtab-vertical") — gate via [data-zen-...] attr. */
+@media all {
   #tabs-newtab-button {
     max-height: var(--tab-min-height);
     display: flex !important;
@@ -1095,7 +1105,8 @@
     }
 
     /* stylelint-disable-next-line media-query-no-invalid */
-    @media -moz-pref("zen.view.show-newtab-button-top") {
+    /* was -moz-pref("zen.view.show-newtab-button-top") — gate via [data-zen-...] attr. */
+    @media all {
       order: -1;
     }
   }
@@ -1194,7 +1205,8 @@
   }
 
   /* stylelint-disable-next-line media-query-no-invalid */
-  @media -moz-pref("zen.theme.essentials-favicon-bg") {
+  /* was -moz-pref("zen.theme.essentials-favicon-bg") — gate via [data-zen-...] attr. */
+  @media all {
     &[visuallyselected] > .tab-stack > .tab-background {
       &::after {
         content: "";
@@ -1207,7 +1219,7 @@
         z-index: -1;
         background-position: center;
         fill: currentColor;
-        -moz-context-properties: fill, fill-opacity;
+        /* -moz-context-properties -> currentColor inheritance on Chromium. */
         /* stylelint-disable-next-line property-no-unknown */
         corner-shape: superellipse(var(--zen-squircle-value));
       }
@@ -1348,7 +1360,8 @@
 }
 
 /* stylelint-disable-next-line media-query-no-invalid */
-@media (-moz-pref("zen.theme.hide-tab-throbber")) {
+/* was (-moz-pref("zen.theme.hide-tab-throbber")) — gate via [data-zen-...] attr. */
+@media all {
   .tab-throbber {
     display: none !important;
   }

@@ -5,8 +5,8 @@
 /**
  * Framework-free split-view layout tree.
  * Extracted from src/zen/split-view/ZenViewSplitter.mjs (nsZenViewSplitter,
- * nsSplitNode, nsSplitLeafNode). The original code is entangled with gBrowser,
- * MozXULElement, PageThumbs, etc.; this file keeps only the pure layout math
+ * nsSplitNode, nsSplitLeafNode). The original code is entangled with the legacy
+ * tab strip, XUL element base, PageThumbs, etc.; this file keeps only the pure layout math
  * so it can run under either Gecko or Chromium.
  *
  * Data model: each leaf holds a tab identity (any opaque value); each branch

@@ -3,6 +3,16 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { nsZenMultiWindowFeature } from "../common/modules/ZenCommonUtils.mjs";
+import {
+  getBoolPrefSync,
+  getIntPrefSync,
+  getStringPrefSync,
+  setIntPref,
+  defineLazyPref,
+  playHapticFeedback,
+} from "../adapters/prefs.mjs";
+import { notifyObservers } from "../adapters/observers.mjs";
+import { parseXULFragment } from "../adapters/xul.mjs";
 
 function parseSinePath(pathStr) {
   const points = [];
@@ -45,24 +55,40 @@ function parseSinePath(pathStr) {
 
 const lazy = {};
 
-ChromeUtils.defineLazyGetter(lazy, "MAX_OPACITY", () => {
-  return parseFloat(
-    document.getElementById("PanelUI-zen-gradient-generator-opacity").max
-  );
+Object.defineProperty(lazy, "MAX_OPACITY", {
+  configurable: true,
+  enumerable: true,
+  get() {
+    return parseFloat(
+      document.getElementById("PanelUI-zen-gradient-generator-opacity").max
+    );
+  },
 });
 
-ChromeUtils.defineLazyGetter(lazy, "MIN_OPACITY", () => {
-  return parseFloat(
-    document.getElementById("PanelUI-zen-gradient-generator-opacity").min
-  );
+Object.defineProperty(lazy, "MIN_OPACITY", {
+  configurable: true,
+  enumerable: true,
+  get() {
+    return parseFloat(
+      document.getElementById("PanelUI-zen-gradient-generator-opacity").min
+    );
+  },
 });
 
-ChromeUtils.defineLazyGetter(lazy, "browserBackgroundElement", () => {
-  return document.getElementById("zen-browser-background");
+Object.defineProperty(lazy, "browserBackgroundElement", {
+  configurable: true,
+  enumerable: true,
+  get() {
+    return document.getElementById("zen-browser-background");
+  },
 });
 
-ChromeUtils.defineLazyGetter(lazy, "toolbarBackgroundElement", () => {
-  return document.getElementById("zen-toolbar-background");
+Object.defineProperty(lazy, "toolbarBackgroundElement", {
+  configurable: true,
+  enumerable: true,
+  get() {
+    return document.getElementById("zen-toolbar-background");
+  },
 });
 
 const EXPLICIT_LIGHTNESS_TYPE = "explicit-lightness";
@@ -80,7 +106,7 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
   useAlgo = "";
   #currentLightness = 50;
 
-  #allowTransparencyOnSidebar = Services.prefs.getBoolPref(
+  #allowTransparencyOnSidebar = getBoolPrefSync(
     "zen.theme.acrylic-elements",
     false
   );
@@ -107,26 +133,50 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
     this.dragStartPosition = null;
 
     this.isLegacyVersion =
-      Services.prefs.getIntPref("zen.theme.gradient-legacy-version", 1) === 0;
+      getIntPrefSync("zen.theme.gradient-legacy-version", 1) === 0;
 
-    ChromeUtils.defineLazyGetter(this, "panel", () =>
-      document.getElementById("PanelUI-zen-gradient-generator")
-    );
-    ChromeUtils.defineLazyGetter(this, "toolbox", () =>
-      document.getElementById("TabsToolbar")
-    );
-    ChromeUtils.defineLazyGetter(this, "customColorInput", () =>
-      document.getElementById("PanelUI-zen-gradient-generator-custom-input")
-    );
-    ChromeUtils.defineLazyGetter(this, "customColorList", () =>
-      document.getElementById("PanelUI-zen-gradient-generator-custom-list")
-    );
+    Object.defineProperty(this, "panel", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return document.getElementById("PanelUI-zen-gradient-generator");
+      },
+    });
+    Object.defineProperty(this, "toolbox", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return document.getElementById("TabsToolbar");
+      },
+    });
+    Object.defineProperty(this, "customColorInput", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return document.getElementById(
+          "PanelUI-zen-gradient-generator-custom-input"
+        );
+      },
+    });
+    Object.defineProperty(this, "customColorList", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return document.getElementById(
+          "PanelUI-zen-gradient-generator-custom-list"
+        );
+      },
+    });
 
-    ChromeUtils.defineLazyGetter(this, "sliderWavePath", () =>
-      document
-        .getElementById("PanelUI-zen-gradient-slider-wave")
-        .querySelector("path")
-    );
+    Object.defineProperty(this, "sliderWavePath", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return document
+          .getElementById("PanelUI-zen-gradient-slider-wave")
+          .querySelector("path");
+      },
+    });
 
     this.panel.addEventListener(
       "popupshowing",
@@ -159,15 +209,15 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
       .matchMedia("(prefers-color-scheme: dark)")
       .addEventListener("change", darkModeChange);
 
-    XPCOMUtils.defineLazyPreferenceGetter(
+    defineLazyPref(
       this,
       "windowSchemeType",
       "zen.view.window.scheme",
-      2,
-      darkModeChange
+      2
     );
+    this._windowSchemeObserver = darkModeChange;
 
-    XPCOMUtils.defineLazyPreferenceGetter(
+    defineLazyPref(
       this,
       "darkModeBias",
       "zen.theme.dark-mode-bias",
@@ -177,7 +227,7 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
 
   handleDarkModeChange() {
     this.updateCurrentWorkspace();
-    Services.obs.notifyObservers(null, "zen-theme-change");
+    notifyObservers(null, "zen-theme-change");
   }
 
   get isDarkMode() {
@@ -206,7 +256,7 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
   }
 
   initContextMenu() {
-    const menu = window.MozXULElement.parseXULToFragment(`
+    const menu = parseXULFragment(`
         <menuitem id="zenToolbarThemePicker"
                   data-lazy-l10n-id="zen-workspaces-change-theme"
                   command="cmd_zenOpenZenThemePicker"/>
@@ -340,7 +390,7 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
       if (themeInt === undefined) {
         return;
       }
-      Services.prefs.setIntPref("zen.view.window.scheme", themeInt);
+      setIntPref("zen.view.window.scheme", themeInt);
     });
   }
 
@@ -404,7 +454,7 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
     if (previousTexture !== this.currentTexture) {
       this.updateCurrentWorkspace();
       /* eslint-disable mozilla/valid-services */
-      Services.zen.playHapticFeedback();
+      playHapticFeedback();
     }
   }
 
@@ -632,7 +682,7 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
   }
 
   addColorToCustomList(color) {
-    const listItems = window.MozXULElement.parseXULToFragment(`
+    const listItems = parseXULFragment(`
         <hbox class="zen-theme-picker-custom-list-item">
           <html:div class="zen-theme-picker-dot custom"></html:div>
           <label class="zen-theme-picker-custom-list-item-label"></label>
@@ -897,7 +947,7 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
 
     if (this.isLegacyVersion && !ignoreLegacy) {
       this.isLegacyVersion = false;
-      Services.prefs.setIntPref("zen.theme.gradient-legacy-version", 1);
+      setIntPref("zen.theme.gradient-legacy-version", 1);
     }
 
     colorPositions.forEach(dotPosition => {
@@ -1226,7 +1276,7 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
     this.currentOpacity = parseFloat(event.target.value);
     // If we reached a whole number (e.g., 0.1, 0.2, etc.), send a haptic feedback.
     if (Math.round(this.currentOpacity * 10) !== this._lastHapticFeedback) {
-      Services.zen.playHapticFeedback();
+      playHapticFeedback();
       this._lastHapticFeedback = Math.round(this.currentOpacity * 10);
     }
     this.updateCurrentWorkspace();
@@ -1389,7 +1439,7 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
   }
 
   shouldBeDarkMode(accentColor) {
-    if (Services.prefs.getBoolPref("zen.theme.use-system-colors")) {
+    if (getBoolPrefSync("zen.theme.use-system-colors", false)) {
       return this.isDarkMode;
     }
 
@@ -1751,7 +1801,7 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
         // Should be set to `this.isLegacyVersion` but for some reason it is set to undefined if we open a private window,
         // so instead get the pref value directly.
         browser.gZenThemePicker.isLegacyVersion =
-          Services.prefs.getIntPref("zen.theme.gradient-legacy-version", 1) ===
+          getIntPrefSync("zen.theme.gradient-legacy-version", 1) ===
           0;
 
         let isDarkMode = isDarkModeWindow;
@@ -1800,7 +1850,7 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
     //   when the user is dragging a dot.
     // TODO(cheff): We should probably find a better way to handle this
     if (!skipUpdate) {
-      Services.obs.notifyObservers(null, "zen-space-gradient-update");
+      notifyObservers(null, "zen-space-gradient-update");
     }
   }
 
@@ -1816,7 +1866,7 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
   }
 
   getNativeAccentColor() {
-    let accentColor = Services.prefs.getStringPref("zen.theme.accent-color");
+    let accentColor = getStringPrefSync("zen.theme.accent-color", "AccentColor");
     let rgb;
     if (accentColor === "AccentColor") {
       const rawRgb = window.getComputedStyle(

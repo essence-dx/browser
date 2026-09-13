@@ -8,11 +8,14 @@ import {
 } from "chrome://browser/content/zen-components/ZenCommonUtils.mjs";
 
 // Chromium migration (lane 3): prefs + storage + session via adapters.
-// Gecko: Services.prefs / IOUtils+PathUtils / SessionStore / Cc[nsIZenModsBackend].
-// Chromium: chrome.storage / chrome.storage.local(+downloads) / chrome.sessions /
-// chrome.scripting (see src/zen/adapters/prefs.mjs, adapters/storage.mjs,
-// adapters/session.mjs). chrome:// import below becomes a shared/ module.
+// Legacy pref store / file helpers / session backend map to adapter modules.
+// Extension storage + local JSON + session restore replace them
+// (see src/zen/adapters/prefs.mjs, adapters/storage.mjs,
+// adapters/session.mjs). Import below becomes a shared module.
 import {
+  addPrefObserver,
+  clearUserPref,
+  getAppInfo,
   getBoolPref,
   getIntPref,
   getStringPref,
@@ -20,6 +23,8 @@ import {
   setIntPref,
   setStringPref,
 } from "../adapters/prefs.mjs";
+import { getSessionInitializedPromise } from "../adapters/session.mjs";
+import { getTopWindow } from "../adapters/windows.mjs";
 import {
   joinPath,
   getProfileDir,
@@ -461,12 +466,11 @@ class nsZenMods extends nsZenPreloadedFeature {
       // If we have a corrupted file, reset it
       await IOUtils.writeJSON(this.modsDataFile, {});
 
-      // Chromium: chrome.windows.getLastFocused + extension toast; Services.wm is Gecko-only.
-      Services.wm
-        .getMostRecentWindow("navigator:browser")
-        .gZenUIManager.showToast("zen-themes-corrupted", {
-          timeout: 8000,
-        });
+      // Chromium: focused window + extension toast replace the legacy lookup.
+      const recentWin = await getTopWindow();
+      recentWin?.gZenUIManager?.showToast("zen-themes-corrupted", {
+        timeout: 8000,
+      });
     }
 
     return mods;
@@ -499,12 +503,12 @@ class nsZenMods extends nsZenPreloadedFeature {
 
   async init() {
     try {
-      // Chromium: getAllWindowsRestoredPromise() / chrome.sessions (see adapters/session.mjs).
-      await SessionStore.promiseInitialized;
+      // Chromium: session-ready gate via adapter (see adapters/session.mjs).
+      await getSessionInitializedPromise();
 
       if (
         getBoolPref("zen.themes.disable-all", false) ||
-        Services.appinfo.inSafeMode
+        getAppInfo().inSafeMode
       ) {
         console.warn("[ZenMods]: Mods disabled by user or in safe mode.");
         return;
@@ -546,24 +550,18 @@ class nsZenMods extends nsZenPreloadedFeature {
       console.error("[ZenMods]: Error loading Zen Mods:", e);
     }
 
-    // Chromium: chrome.storage.onChanged; Services.prefs.addObserver is Gecko-only.
-    Services.prefs.addObserver(
-      this.updatePref,
-      this.#rebuildModsStylesheet.bind(this)
-    );
-    // Chromium: chrome.storage.onChanged; Services.prefs.addObserver is Gecko-only.
-    Services.prefs.addObserver(
-      "zen.themes.disable-all",
-      this.#handleDisableMods.bind(this)
-    );
+    // Chromium: storage onChanged replaces the legacy pref observer.
+    addPrefObserver(this.updatePref, this.#rebuildModsStylesheet.bind(this));
+    // Chromium: storage onChanged replaces the legacy pref observer.
+    addPrefObserver("zen.themes.disable-all", this.#handleDisableMods.bind(this));
   }
 
   #setNewMilestoneIfNeeded() {
     const previousMilestone = getStringPref("zen.mods.milestone", "");
-    if (previousMilestone != Services.appinfo.version) {
-      setStringPref("zen.mods.milestone", Services.appinfo.version);
-      // Chromium: chrome.storage.local.remove(); clearUserPref is Gecko-only.
-      Services.prefs.clearUserPref("zen.mods.last-update");
+    if (previousMilestone != getAppInfo().version) {
+      setStringPref("zen.mods.milestone", getAppInfo().version);
+      // Chromium: local storage remove replaces the legacy clear call.
+      void clearUserPref("zen.mods.last-update");
     }
   }
 

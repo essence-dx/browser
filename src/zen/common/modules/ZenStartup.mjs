@@ -7,10 +7,16 @@ import checkForZenUpdates, {
   playWindowSweepAnimation,
 } from "./ZenUpdates.mjs";
 import {
-  getBoolPref,
+  getBoolPrefSync,
+  getAppInfo,
   setBoolPref,
   setStringPref,
 } from "../../adapters/prefs.mjs";
+import { addObserver, removeObserver } from "../../adapters/observers.mjs";
+import { getAllWindowsRestoredPromise } from "../../adapters/session.mjs";
+import { loadVendorScript } from "../../adapters/xul.mjs";
+import { ZenProgressBar } from "../sys/ui/ZenProgressBar.sys.mjs";
+import { ZenSpaceRoutingNavigation } from "../sys/ui/ZenSpaceRoutingNavigation.sys.mjs";
 // Gecko now; Chromium: chrome.storage.local — same adapter surface.
 // Welcome loader below uses a relative path (was chrome://); Chromium loads
 // the welcome module via chrome.runtime.getURL.
@@ -31,7 +37,7 @@ class ZenStartup {
 
   get #shouldUseWatermark() {
     return (
-      getBoolPref("zen.watermark.enabled", false) &&
+      getBoolPrefSync("zen.watermark.enabled", false) &&
       gZenWorkspaces.shouldHaveWorkspaces
     );
   }
@@ -73,7 +79,7 @@ class ZenStartup {
     if (gBrowserInit.delayedStartupFinished) {
       this.delayedStartupFinished();
     } else {
-      Services.obs.addObserver(this, "browser-delayed-startup-finished");
+      addObserver(this, "browser-delayed-startup-finished");
     }
   }
 
@@ -81,7 +87,7 @@ class ZenStartup {
     // This nsIObserver method allows us to defer initialization until after
     // this window has finished painting and starting up.
     if (aTopic == "browser-delayed-startup-finished" && aSubject == window) {
-      Services.obs.removeObserver(this, "browser-delayed-startup-finished");
+      removeObserver(this, "browser-delayed-startup-finished");
       this.delayedStartupFinished();
     }
   }
@@ -89,7 +95,7 @@ class ZenStartup {
   delayedStartupFinished() {
     gZenWorkspaces.promiseInitialized.then(async () => {
       await delayedStartupPromise;
-      await SessionStore.promiseAllWindowsRestored;
+      await getAllWindowsRestoredPromise();
       delete gZenUIManager.promiseInitialized;
       gZenCompactModeManager.init();
       // Fix for https://github.com/zen-browser/desktop/issues/7605, specially in compact mode
@@ -166,32 +172,31 @@ class ZenStartup {
   }
 
   #initUIComponents() {
-    const kUIComponents = ["ZenProgressBar", "ZenSpaceRoutingNavigation"];
-    for (let component of kUIComponents) {
-      const module = ChromeUtils.importESModule(
-        "resource:///modules/zen/ui/" + component + ".sys.mjs"
-      );
-      new module[component](window);
+    const kUIComponents = [ZenProgressBar, ZenSpaceRoutingNavigation];
+    for (const Component of kUIComponents) {
+      new Component(window);
     }
   }
 
   #checkForWelcomePage() {
     const kWelcomeScreenSeenPref = "zen.welcome-screen.seen";
-    if (Services.env.get("MOZ_HEADLESS")) {
+    // No env service on Chromium; headless is handled by the embedder.
+    const isHeadless = false;
+    if (isHeadless) {
       setBoolPref(kWelcomeScreenSeenPref, true);
       return;
     }
-    if (!getBoolPref(kWelcomeScreenSeenPref, false)) {
+    if (!getBoolPrefSync(kWelcomeScreenSeenPref, false)) {
       setBoolPref(kWelcomeScreenSeenPref, true);
       setStringPref(
         "zen.updates.last-build-id",
-        Services.appinfo.appBuildID
+        getAppInfo().appBuildID
       );
       setStringPref(
         "zen.updates.last-version",
-        Services.appinfo.version
+        getAppInfo().version
       );
-      Services.scriptloader.loadSubScript(
+      loadVendorScript(
         "../../welcome/ZenWelcome.mjs",
         // was: chrome://browser/content/zen-components/ZenWelcome.mjs
         window
