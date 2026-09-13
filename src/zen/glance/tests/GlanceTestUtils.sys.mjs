@@ -12,8 +12,7 @@ export function openGlanceOnTab(window, callback, close = true) {
         clientY: 0,
         width: 0,
         height: 0,
-        triggeringPrincipal:
-          Services.scriptSecurityManager.getSystemPrincipal(),
+        triggeringPrincipal: null,
       })
       .then(async glanceTab => {
         await callback(glanceTab);
