@@ -1,99 +1,52 @@
-# Zen Chromium build (GN) — Views + chrome.* equivalents for Gecko patches.
-# Each source_set below corresponds to rows in patches-mapping.md (125 patches).
-# Shell boots shell/tabs.html (tab 1 Chromium, tab 2 Gecko dual-boot).
+# //zen/BUILD.gn — Zen Browser layer on top of Chromium's //chrome.
+#
+# Replaces the previous engine-chromium/BUILD.gn, which was not valid GN:
+#   - it listed .html/.css/.json files under source_set(sources = [...]),
+#     but GN sources must be compilable inputs, so the target could never
+#     generate;
+#   - it depended on //zen/adapters:tabs, :windows and :session — none of
+#     those existed as GN targets, so the dep graph was unresolvable;
+#   - shell_app and shell_actors were declared and never referenced.
+#
+# This file is copied to <chromium>/src/zen/BUILD.gn by bootstrap.sh. It cannot
+# be generated outside a Chromium checkout: every dep below resolves inside
+# that tree, so `gn gen` is only meaningful once the checkout exists.
+#
+# Integration: //chrome/browser/BUILD.gn must add "//zen" to the deps of the
+# target that links chrome.exe. zen_layer.cc holds the entry point.
 
-group("zen") {
+import("//build/config/features.gni")
+
+static_library("zen") {
+  sources = [
+    "zen_layer.cc",
+    "zen_layer.h",
+    "zen_tab_model.cc",
+    "zen_tab_model.h",
+    "zen_vertical_tab_strip.cc",
+    "zen_vertical_tab_strip.h",
+  ]
+
   deps = [
-    ":shell_window",
-    ":shell_tabs",
-    ":shell_theme",
-    ":shell_menus",
-    ":shell_toolbar",
-    ":shell_pages",
-    ":shell_options",
-    ":shell_omnibox",
-    ":shell_capture",
-    ":shell_newtab",
-    ":shell_compat",
-    ":shell_policy",
-    "//zen/adapters:tabs",
-    "//zen/adapters:windows",
-    "//zen/adapters:session",
+    "//base",
+    "//chrome/browser",
+    "//components/sessions",
+    "//content/public/browser",
+    "//ui/base",
+    "//ui/events",
+    "//ui/gfx",
+    "//ui/views",
+    "//ui/views/controls",
+    "//url",
   ]
 }
 
-source_set("shell_window") {
-  sources = [
-    "shell/tabs.html",
-    "shell/shell.css",
-    "shell/dual-boot.js",
+# Prefs and policy live in engine-chromium/{prefs.json,policy/}. Chromium reads
+# them through the normal pref-registration path, not as compile inputs, so
+# they are attached as data rather than listed in sources.
+group("zen_config") {
+  data = [
+    "//zen/prefs.json",
+    "//zen/policy/policy.json",
   ]
-  deps = [ ":shell_tabs" ]
-}
-
-source_set("shell_tabs") {
-  sources = [
-    "shell/tabs.js",
-    "shell/splitview.js",
-    "shell/workspaces.js",
-  ]
-  deps = [ "//zen/adapters:tabs" ]
-}
-
-source_set("shell_theme") {
-  sources = [ "shell/shell.css" ]
-}
-
-source_set("shell_menus") {
-  sources = [ "shell/background.js" ]
-}
-
-source_set("shell_toolbar") {
-  sources = [
-    "shell/tabs.html",
-    "shell/tabs.js",
-  ]
-}
-
-source_set("shell_pages") {
-  sources = [ "shell/tabs.html" ]
-}
-
-source_set("shell_options") {
-  sources = [
-    "prefs.json",
-    "policy/policy.json",
-  ]
-}
-
-source_set("shell_omnibox") {
-  sources = [ "shell/background.js" ]
-}
-
-source_set("shell_capture") {
-  sources = [ "shell/background.js" ]
-}
-
-source_set("shell_newtab") {
-  sources = [ "shell/tabs.html" ]
-}
-
-source_set("shell_compat") {
-  sources = [ "shell/shell.css" ]
-}
-
-source_set("shell_policy") {
-  sources = [ "policy/policy.json" ]
-}
-
-source_set("shell_app") {
-  sources = [
-    "shell/tabs.html",
-    "manifest.json",
-  ]
-  deps = [ ":shell_window" ]
-}
-
-source_set("shell_actors") {
-  sources = [ "shell/background.js" ]
 }

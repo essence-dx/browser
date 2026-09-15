@@ -1,0 +1,34 @@
+# GN args for the Zen Chromium lane.
+# Copied to <chromium>/src/out/Zen/args.gn by bootstrap.sh.
+#
+# These are chosen for a first working build on a disk-constrained machine.
+# The defaults (is_official_build, full symbols, PGO) need well over 100 GB and
+# many hours; the values below are the smallest configuration that still
+# produces a real, runnable chrome.exe with the //zen layer linked in.
+
+target_os = "win"
+target_cpu = "x64"
+
+is_debug = false
+is_component_build = false
+is_official_build = false          # official build pulls PGO profiles + LTO
+
+# Symbols are the single biggest consumer of out/. 0 = none.
+symbol_level = 0
+blink_symbol_level = 0
+v8_symbol_level = 0
+
+# Drop subsystems Zen does not use, to cut both build time and out/ size.
+enable_nacl = false
+enable_widevine = false
+enable_remoting = false
+enable_reporting = false
+enable_background_mode = false
+
+# No PGO/BOLT: needs a merged.profdata that we do not have, and it roughly
+# doubles build time.
+chrome_pgo_phase = 0
+use_thin_lto = false
+
+# Faster linking on Windows; link is a large fraction of total build time.
+use_lld = true
