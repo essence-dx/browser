@@ -6,7 +6,7 @@ import { nsZenMultiWindowFeature } from "./ZenCommonUtils.mjs";
 import { nsZenMenuBar } from "./ZenMenubar.mjs";
 // Gecko: UrlbarShared (toolkit urlbar) — Lane 3 migrates urlbar/ to omnibox;
 // Chromium: chrome.omnibox — see src/zen/urlbar (Lane 3).
-// import { UrlbarShared } from "chrome://browser/content/urlbar/UrlbarShared.mjs";
+// import { UrlbarShared } from "../urlbar/UrlbarShared.mjs";
 import { registerZenUrlbarProviders } from "../../urlbar/ZenUBProvider.sys.mjs";
 import { nsZenSiteDataPanel as ZenSiteDataPanel } from "../../urlbar/ZenSiteDataPanel.sys.mjs";
 import {
@@ -61,10 +61,7 @@ window.gZenUIManager = {
       configurable: true,
       enumerable: true,
       get: () => {
-        loadVendorScript(
-          "chrome://browser/content/zen-vendor/motion.min.mjs",
-          window
-        );
+        loadVendorScript("../../vendor/motion.min.mjs", window);
         const motion = window.Motion;
         delete window.Motion;
         return motion;
@@ -1022,7 +1019,7 @@ window.gZenVerticalTabsManager = {
       get: () => {
         return !(
           window.AppConstants.platform === "macosx" ||
-          window.matchMedia("(-moz-gtk-csd-reversed-placement)").matches ||
+          document.documentElement.getAttribute("dir") === "rtl" ||
           getBoolPrefSync(
             "zen.view.experimental-force-window-controls-left"
           )

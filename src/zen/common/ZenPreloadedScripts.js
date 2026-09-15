@@ -2,9 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// Migration note (Lane 2): chrome:// + resource:// URLs below are Gecko module
-// paths; Chromium loads the same UI modules as extension pages/scripts via
-// chrome.runtime.getURL / import — see src/zen/adapters/*.mjs import targets.
+// Migration note (Lane 2): relative UI module paths below work on both
+// engines; Chromium loads the same UI modules as extension pages/scripts via
+// runtime URL and import — see src/zen/adapters import targets.
 import { loadVendorScript } from "../adapters/xul.mjs";
 import { gZenSpaceRoutingManager as ZenSpaceRoutingManagerModule } from "../space-routing/ZenSpaceRoutingManager.sys.mjs";
 // prettier-ignore
@@ -12,36 +12,36 @@ import { gZenSpaceRoutingManager as ZenSpaceRoutingManagerModule } from "../spac
 {
   globalThis.gZenSpaceRoutingManager = ZenSpaceRoutingManagerModule;
 
-  loadVendorScript("chrome://browser/content/zen-components/ZenSpaceBookmarksStorage.js", globalThis);
+  loadVendorScript("../spaces/ZenSpaceBookmarksStorage.js", globalThis);
 
   let scripts = [
-    "chrome://browser/content/ZenStartup.mjs",
-    "resource:///modules/zen/ZenSpaceManager.mjs",
-    "chrome://browser/content/zen-components/ZenCompactMode.mjs",
-    "chrome://browser/content/ZenUIManager.mjs",
-    "chrome://browser/content/zen-components/ZenMods.mjs",
-    "chrome://browser/content/zen-components/ZenKeyboardShortcuts.mjs",
-    "chrome://browser/content/zen-components/ZenSession.mjs",
-    "chrome://browser/content/zen-components/ZenMediaController.mjs",
-    "chrome://browser/content/zen-components/ZenGlanceManager.mjs",
-    "chrome://browser/content/zen-components/ZenPinnedTabManager.mjs",
-    "chrome://browser/content/zen-components/ZenViewSplitter.mjs",
-    "chrome://browser/content/zen-components/ZenFolders.mjs",
-    "chrome://browser/content/zen-components/ZenEmojiPicker.mjs",
-    "chrome://browser/content/zen-components/ZenLiveFoldersUI.mjs",
-    "chrome://browser/content/zen-components/ZenDownloadAnimation.mjs",
+    "./modules/ZenStartup.mjs",
+    "../spaces/ZenSpaceManager.mjs",
+    "../compact-mode/ZenCompactMode.mjs",
+    "./modules/ZenUIManager.mjs",
+    "../mods/ZenMods.mjs",
+    "../kbs/ZenKeyboardShortcuts.mjs",
+    "./modules/ZenSession.mjs",
+    "../media/ZenMediaController.mjs",
+    "../glance/ZenGlanceManager.mjs",
+    "../tabs/ZenPinnedTabManager.mjs",
+    "../split-view/ZenViewSplitter.mjs",
+    "../folders/ZenFolders.mjs",
+    "./emojis/ZenEmojiPicker.mjs",
+    "../live-folders/ZenLiveFoldersUI.mjs",
+    "../downloads/ZenDownloadAnimation.mjs",
   ];
 
   for (let script of scripts) {
-            // Was Chrome utils importESModule(script, { global: "current" }).
+            // Was platform importESModule(script, { global: "current" }).
     import(script);
   }
 
   let customZenElements = [
-    ["zen-folder", "chrome://browser/content/zen-components/ZenFolder.mjs"],
-    ["zen-workspace-creation", "resource:///modules/zen/ZenSpaceCreation.mjs"],
-    ["zen-workspace", "resource:///modules/zen/ZenSpace.mjs"],
-    ["zen-workspace-icons", "resource:///modules/zen/ZenSpaceIcons.mjs"]
+    ["zen-folder", "../folders/ZenFolder.mjs"],
+    ["zen-workspace-creation", "../spaces/ZenSpaceCreation.mjs"],
+    ["zen-workspace", "../spaces/ZenSpace.mjs"],
+    ["zen-workspace-icons", "../spaces/ZenSpaceIcons.mjs"]
   ];
 
   document.addEventListener(
@@ -54,7 +54,7 @@ import { gZenSpaceRoutingManager as ZenSpaceRoutingManagerModule } from "../spac
         customElements.setElementCreationCallback(
           tag,
           function customElementCreationCallback() {
-    // Was Chrome utils importESModule(script, { global: "current" }).
+    // Was platform importESModule(script, { global: "current" }).
             import(script);
           }
         );
@@ -63,5 +63,5 @@ import { gZenSpaceRoutingManager as ZenSpaceRoutingManagerModule } from "../spac
     { once: true }
   );
 
-  loadVendorScript("chrome://browser/content/zen-components/ZenDragAndDrop.js", globalThis);
+  loadVendorScript("../drag-and-drop/ZenDragAndDrop.js", globalThis);
 }

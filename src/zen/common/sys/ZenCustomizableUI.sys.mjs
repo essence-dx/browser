@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
+import { AppConstants } from "../../adapters/gre.mjs";
 // Gecko CustomizableUI area registration; Chromium: no equivalent — sidebar
 // buttons become extension action/popup HTML (see adapters/xul.mjs).
 import {
@@ -168,7 +168,7 @@ export const ZenCustomizableUI = new (class {
     );
     if (
       window.AppConstants.platform === "macosx" ||
-      window.matchMedia("(-moz-gtk-csd-reversed-placement)").matches
+      window.document.documentElement.getAttribute("dir") === "rtl"
     ) {
       for (let i = 0; i < windowControls.length; i++) {
         if (i === 0) {

@@ -88,10 +88,7 @@ class nsZenEmojiPicker extends nsZenDOMOperatedFeature {
       return this._emojis;
     }
     const lazy = {};
-    loadVendorScript(
-      "chrome://browser/content/zen-components/ZenEmojisData.min.mjs",
-      lazy
-    );
+    loadVendorScript("./ZenEmojisData.min.mjs", lazy);
     /* eslint-disable mozilla/valid-lazy */
     this._emojis = lazy.ZenEmojisData;
     return this._emojis;
@@ -249,7 +246,13 @@ class nsZenEmojiPicker extends nsZenDOMOperatedFeature {
   }
 
   #selectEmoji(emoji) {
-    if (this.#emojiAsSVG && emoji && !emoji.startsWith("chrome://")) {
+    if (
+      this.#emojiAsSVG &&
+      emoji &&
+      !emoji.includes("://") &&
+      !emoji.startsWith("../") &&
+      !emoji.startsWith("/")
+    ) {
       emoji = `data:image/svg+xml;base64,${btoa(
         `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><text y="28" font-size="28" x="0">${unescape(
           encodeURIComponent(emoji)
@@ -303,7 +306,7 @@ class nsZenEmojiPicker extends nsZenDOMOperatedFeature {
   }
 
   getSVGURL(icon) {
-    return `chrome://browser/skin/zen-icons/selectable/${icon}`;
+    return `../assets/icons/selectable/${icon}`;
   }
 }
 

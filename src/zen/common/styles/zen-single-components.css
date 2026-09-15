@@ -25,7 +25,7 @@
 }
 
 /* stylelint-disable-next-line media-query-no-invalid */
-/* was @media -moz-pref("zen.theme.disable-lightweight") — gate via [data-zen-...] attr. */
+/* was @media legacy-pref("zen.theme.disable-lightweight") — gate via [data-zen-...] attr. */
 @media all {
   #customization-lwtheme-link {
     display: none !important;
@@ -259,13 +259,13 @@
 
 #TabsToolbar {
   gap: var(--zen-toolbox-padding);
-  -webkit-app-region: no-drag; /* was -moz-window-dragging: unset */
+  -webkit-app-region: no-drag; /* was legacy-window-dragging: unset */
 }
 
 /* Status panel */
 
 /* stylelint-disable-next-line media-query-no-invalid */
-/* was @media (-moz-pref("zen.theme.styled-status-panel")) — gate via [data-zen-...] attr. */
+/* was @media (legacy-pref("zen.theme.styled-status-panel")) — gate via [data-zen-...] attr. */
 @media all {
   #statuspanel {
     padding: 6px;
@@ -346,7 +346,7 @@
       align-items: center;
       border-radius: 6px;
 
-      @media not (-moz-platform: macos) {
+      :root:not([data-platform="macos"]) & {
         border-radius: 4px;
       }
 
@@ -427,7 +427,7 @@
   border-radius: 8px;
   transform: scale(1);
 
-  /* was -moz-context-properties: fill. */
+  /* was legacy-context-properties: fill. */
   fill: white;
 
   &:active {
@@ -486,7 +486,7 @@
   }
 
   & image {
-    /* was -moz-context-properties: fill. */
+    /* was legacy-context-properties: fill. */
     z-index: 1;
   }
 
@@ -553,7 +553,7 @@
 }
 
 /* stylelint-disable-next-line media-query-no-invalid */
-/* was @media -moz-pref("zen.theme.hide-unified-extensions-button") — gate via [data-zen-...] attr. */
+/* was @media legacy-pref("zen.theme.hide-unified-extensions-button") — gate via [data-zen-...] attr. */
 @media all {
   #unified-extensions-button:not([showing]) {
     display: none !important;
@@ -561,7 +561,7 @@
 }
 
 /* stylelint-disable-next-line media-query-no-invalid */
-/* was @media not -moz-pref("zen.theme.hide-unified-extensions-button") — gate via [data-zen-...] attr. */
+/* was @media not legacy-pref("zen.theme.hide-unified-extensions-button") — gate via [data-zen-...] attr. */
 @media all {
   #zen-site-data-section-addons {
     display: none;
@@ -581,7 +581,7 @@
   & toolbarbutton {
     margin: 0;
     appearance: none;
-    /* was -moz-context-properties: fill. */
+    /* was legacy-context-properties: fill. */
     fill: currentColor;
     color: light-dark(rgba(0, 0, 0, 0.8), rgba(255, 255, 255, 0.8));
     width: var(--size-item-xlarge);
@@ -610,7 +610,7 @@
       height: 100%;
       will-change: transform;
 
-      /* was @media (-moz-platform: macos) — gate via [data-platform="macos"]. */
+      /* was @media (legacy-platform: macos) — gate via [data-platform="macos"]. */
       @media all {
         background: linear-gradient(to bottom, light-dark(rgb(255, 255, 255), rgb(34, 34, 34)), light-dark(rgb(246, 246, 246), rgb(21, 21, 21)));
 
@@ -622,7 +622,7 @@
         border: 0.5px solid light-dark(var(--base-border-color), rgb(21, 21, 21));
       }
 
-      @media not (-moz-platform: macos) {
+      :root:not([data-platform="macos"]) & {
         border-radius: 4px;
         background-color: color-mix(in srgb, currentcolor 6%, transparent);
       }
@@ -797,7 +797,7 @@
   }
 
   /* stylelint-disable-next-line media-query-no-invalid */
-  /* was @media not -moz-pref("zen.view.enable-loading-indicator") — gate via [data-zen-...] attr. */
+  /* was @media not legacy-pref("zen.view.enable-loading-indicator") — gate via [data-zen-...] attr. */
   @media all {
     display: none;
   }

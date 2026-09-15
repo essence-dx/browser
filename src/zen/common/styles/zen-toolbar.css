@@ -5,7 +5,7 @@
  */
 
 @import url('zen-overflowing-addons.css');
-/* Chromium: relative import (was %include). */
+/* Chromium: relative import (was include-directive). */
 
 #nav-bar,
 #zen-sidebar-top-buttons {

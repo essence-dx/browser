@@ -1382,8 +1382,11 @@ window.gZenKeyboardShortcutsManager = {
   },
 
   get inBrowserView() {
-    // Gecko: chrome://browser/content/browser.xhtml; Chromium: main window URL.
-    return window.location.href == "chrome://browser/content/browser.xhtml";
+    // Main window URL on both engines (Gecko browser.xhtml, Chromium shell page).
+    return (
+      window.location.href.includes("browser") ||
+      window.location.protocol.startsWith("chrome-extension")
+    );
   },
 
   async _loadSaved() {
@@ -1405,7 +1408,7 @@ window.gZenKeyboardShortcutsManager = {
           {
             label: { "l10n-id": "zen-shortcuts-corrupted" },
             image:
-              "chrome://browser/skin/notification-icons/persistent-storage-blocked.svg",
+              "../assets/notification-icons/persistent-storage-blocked.svg",
               // Chromium: chrome.runtime.getURL(...) asset.
             priority: gNotificationBox.PRIORITY_WARNING_HIGH,
           },

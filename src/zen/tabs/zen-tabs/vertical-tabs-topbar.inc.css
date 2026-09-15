@@ -6,7 +6,7 @@
 
 @import url('../../compact-mode/windows-captions-fix-active.inc.css');
 @import url('../../compact-mode/windows-captions-fix-default.inc.css');
-/* Chromium: relative imports (were %include). Conditionally-applied contents
+/* Chromium: relative imports (were include-directive). Conditionally-applied contents
    noted at use sites below. */
 
 --zen-toolbar-height: 34px;
@@ -19,7 +19,7 @@ z-index: 1;
   min-height: var(--zen-toolbar-height);
 }
 
-/* was @media -moz-pref('zen.view.hide-window-controls') — gate via [data-zen-...] attr. */
+/* was @media legacy-pref('zen.view.hide-window-controls') — gate via [data-zen-...] attr. */
 @media all {
   transition: height var(--zen-hidden-toolbar-transition), opacity var(--zen-hidden-toolbar-transition);
   transition-delay: 0.2s;
@@ -37,7 +37,7 @@ z-index: 1;
     /* windows-captions-fix-default.inc.css now imported at top level (Chromium). */
   }
 
-  /* was -moz-pref('zen.view.experimental-no-window-controls') / (not -moz-pref("browser.tabs.inTitlebar")). */
+  /* was legacy-pref('zen.view.experimental-no-window-controls') / (not legacy-pref("browser.tabs.inTitlebar")). */
   @media all {
     :root:not([zen-has-bookmarks]) & {
       max-height: 0 !important;

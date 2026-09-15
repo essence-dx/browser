@@ -5,7 +5,7 @@
  */
 @import url('create-workspace-form.css');
 @import url('overflow-icons.inc.css');
-/* Chromium: relative imports (were @namespace XUL + %include).
+/* Chromium: relative imports (were namespace-rule XUL + include-directive).
    Namespace selectors below use plain element names. */
 
 #zen-workspaces-button {
@@ -16,7 +16,7 @@
   padding: 0;
 
   position: relative;
-  -webkit-app-region: no-drag; /* was -moz-window-dragging */
+  -webkit-app-region: no-drag; /* was legacy-window-dragging */
 
   &[dont-show='true'] {
     display: none !important;
@@ -41,7 +41,7 @@
     align-items: center;
     position: relative;
     fill-opacity: 0.6;
-    /* was -moz-context-properties: fill-opacity, fill. */
+    /* was legacy-context-properties: fill-opacity, fill. */
     fill: currentColor;
     scroll-margin: 0 20px;
 
@@ -51,7 +51,7 @@
       position: absolute;
       font-size: 12px;
 
-      /* was @media (-moz-platform: macos) — gate via [data-platform="macos"]. */
+      /* was @media (legacy-platform: macos) — gate via [data-platform="macos"]. */
 
       &:is(img) {
         width: 14px;
@@ -180,7 +180,7 @@
   width: 100%;
   font-size: small;
   padding-right: 12px;
-  -webkit-app-region: no-drag; /* was -moz-window-dragging */
+  -webkit-app-region: no-drag; /* was legacy-window-dragging */
 
   &::before {
     border-radius: var(--border-radius-medium);
@@ -218,7 +218,7 @@
     justify-content: center;
     align-items: center;
     fill-opacity: 1;
-    /* was -moz-context-properties: fill-opacity, fill. */
+    /* was legacy-context-properties: fill-opacity, fill. */
     fill: var(--zen-sidebar-themed-icon-fill);
     font-size: 16px;
     padding-top: 2px;
@@ -240,7 +240,7 @@
       pointer-events: none;
     }
 
-    /* was @media (-moz-platform: windows) — gate via [data-platform="windows"]. */
+    /* was @media (legacy-platform: windows) — gate via [data-platform="windows"]. */
   }
 
   .zen-current-workspace-indicator-name {
@@ -393,15 +393,15 @@ zen-workspace {
     }
   }
 
-  /* was @media -moz-pref('zen.view.draggable-sidebar') — gate via [data-zen-...] attr. */
+  /* was @media legacy-pref('zen.view.draggable-sidebar') — gate via [data-zen-...] attr. */
   @media all {
     &[active] .zen-workspace-empty-space {
-      -webkit-app-region: drag; /* was -moz-window-dragging */
+      -webkit-app-region: drag; /* was legacy-window-dragging */
     }
   }
 
   :root:not(:is([animating-background], [swipe-gesture])) #navigator-toolbox:not([movingtab]) &:not([active]) {
-    /* was -moz-subtree-hidden-only-visually: 1 — Chromium: visibility handled by layout. */
+    /* was legacy-subtree-hidden-only-visually: 1 — Chromium: visibility handled by layout. */
     visibility: hidden;
   }
 }

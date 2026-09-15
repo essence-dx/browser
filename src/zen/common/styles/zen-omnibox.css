@@ -203,7 +203,7 @@
 }
 
 /* stylelint-disable-next-line media-query-no-invalid */
-/* was @media -moz-pref("zen.urlbar.single-toolbar-show-copy-url", false) — gate via [data-zen-...] attr. */
+/* was @media legacy-pref("zen.urlbar.single-toolbar-show-copy-url", false) — gate via [data-zen-...] attr. */
 @media all {
   :root[zen-single-toolbar="true"] #zen-copy-url-button {
     display: none !important;
@@ -211,7 +211,7 @@
 }
 
 /* stylelint-disable-next-line media-query-no-invalid */
-/* was @media not -moz-pref("zen.urlbar.show-pip-button") — gate via [data-zen-...] attr. */
+/* was @media not legacy-pref("zen.urlbar.show-pip-button") — gate via [data-zen-...] attr. */
 @media all {
   #picture-in-picture-button {
     display: none !important;
@@ -261,7 +261,7 @@
   :root[zen-single-toolbar="true"] & .urlbar-input-box,
   &[zen-floating-urlbar="true"] .urlbar-input-box {
     font-weight: 500;
-    /* was @media (-moz-platform: linux) (font-weight: 400) — gate via [data-platform="linux"]. */
+    /* was @media (legacy-platform: linux) (font-weight: 400) — gate via [data-platform="linux"]. */
   }
 
   & #identity-box {
@@ -275,7 +275,7 @@
   & .urlbar-background {
     --zen-urlbar-background-base: light-dark(#fbfbfb, color-mix(in srgb, hsl(0, 0%, 6.7%), var(--zen-colors-primary) 30%));
     /* stylelint-disable-next-line media-query-no-invalid */
-    /* was @media -moz-pref("zen.theme.acrylic-elements") and (not (prefers-reduced-transparency: reduce)). */
+    /* was @media legacy-pref("zen.theme.acrylic-elements") and (not (prefers-reduced-transparency: reduce)). */
     @media (not (prefers-reduced-transparency: reduce)) {
       --zen-urlbar-background-transparent: light-dark(
         color-mix(in srgb, white 80%, transparent),
@@ -289,7 +289,7 @@
     outline-offset: var(--zen-urlbar-outline-offset) !important;
 
     /* stylelint-disable-next-line media-query-no-invalid */
-    /* was @media -moz-pref("zen.theme.acrylic-elements") — gate via [data-zen-...] attr. */
+    /* was @media legacy-pref("zen.theme.acrylic-elements") — gate via [data-zen-...] attr. */
     @media all {
       backdrop-filter: var(--zen-urlbar-filter) !important;
     }
@@ -487,7 +487,7 @@
   min-width: min(90%, 62rem) !important;
   width: var(--zen-urlbar-width, min(90%, 62rem)) !important;
   font-size: 1.15em !important;
-  /* was @media (-moz-platform: macos) (font-size: 1.5em) — gate via [data-platform="macos"]. */
+  /* was @media (legacy-platform: macos) (font-size: 1.5em) — gate via [data-platform="macos"]. */
   top: var(--zen-urlbar-top) !important;
   translate: -50% 0%;
   left: 50% !important;
@@ -514,7 +514,7 @@
 }
 
 /* stylelint-disable-next-line media-query-no-invalid */
-/* was @media not -moz-pref("zen.urlbar.show-protections-icon") — gate via [data-zen-...] attr. */
+/* was @media not legacy-pref("zen.urlbar.show-protections-icon") — gate via [data-zen-...] attr. */
 @media all {
   #tracking-protection-icon-container {
     display: none !important;
@@ -577,7 +577,7 @@
   color: color-mix(in srgb, var(--zen-primary-color), currentColor 95%);
 
   & img {
-    /* was -moz-context-properties: fill. */
+    /* was legacy-context-properties: fill. */
     fill: currentColor;
     width: var(--size-item-small);
     height: var(--size-item-small);
@@ -618,7 +618,7 @@
 
       background-color: currentColor;
       mask-image: url("../../zen-icons/urlbar-arrow.svg");
-      /* Chromium: relative asset path (was chrome://...). */
+      /* Chromium: relative asset path (was chromium-url/...). */
       mask-size: contain;
       mask-repeat: no-repeat;
       mask-position: center;
@@ -746,7 +746,7 @@
 }
 
 /* stylelint-disable-next-line media-query-no-invalid */
-/* was @media not -moz-pref("zen.urlbar.show-contextual-id") — gate via [data-zen-...] attr. */
+/* was @media not legacy-pref("zen.urlbar.show-contextual-id") — gate via [data-zen-...] attr. */
 @media all {
   #userContext-icons {
     display: none !important;

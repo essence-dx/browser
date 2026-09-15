@@ -6,10 +6,10 @@
 
 menupopup,
 panel[type="arrow"]:not(#feature-callout) {
-  /* was @media (-moz-windows-mica-popups) — Windows Mica popups only. */
+  /* was @media (legacy-windows-mica-popups) — Windows Mica popups only. */
   @media all {
     appearance: auto !important;
-    /* was -moz-default-appearance: menupopup. */
+    /* was legacy-default-appearance: menupopup. */
     /* The blur behind doesn't blur all that much, add a semi-transparent
      * background to improve contrast */
     --panel-background-color: light-dark(rgba(255, 255, 255, 0.5), rgba(0, 0, 0, 0.5)) !important;
@@ -31,11 +31,11 @@ panel[type="arrow"]:not(#feature-callout) {
     }
   }
 
-  /* was @media (-moz-platform: macos) — gate macOS via [data-platform="macos"]. */
+  /* was @media (legacy-platform: macos) — gate macOS via [data-platform="macos"]. */
   @media all {
     &:is([nonnative], :not([type="arrow"])) {
       appearance: auto !important;
-      /* was -moz-default-appearance: menupopup. */
+      /* was legacy-default-appearance: menupopup. */
       /* We set the default background here, rather than on ::part(content),
        * because otherwise it'd interfere with the native look. Non-native-looking
        * popups should get their background via --panel-background */

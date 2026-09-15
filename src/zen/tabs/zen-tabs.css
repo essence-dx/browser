@@ -8,7 +8,7 @@
 @import url('zen-tabs/vertical-tabs-topbar.inc.css');
 @import url('zen-tabs/vertical-tabs-topbuttons-fix.css');
 @import url('zen-essentials-promo.css');
-/* Chromium: relative imports (were %include + chrome://...). Topbar/topbuttons
+/* Chromium: relative imports (were include-directive + chromium-url/...). Topbar/topbuttons
    includes apply under the conditional selectors noted below. */
 
 #zen-tabbox-wrapper {
@@ -30,7 +30,7 @@
 :root[zen-single-toolbar='true']:not([customizing]) {
   #zen-appcontent-navbar-wrapper {
     display: flex;
-    -webkit-app-region: drag; /* Allow dragging the window via this bar (was -moz-window-dragging) */
+    -webkit-app-region: drag; /* Allow dragging the window via this bar (was legacy-window-dragging) */
     min-height: var(--zen-element-separation);
     height: var(--zen-element-separation);
 

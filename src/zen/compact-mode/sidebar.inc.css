@@ -51,7 +51,7 @@
     --zen-toolbox-max-width: 74px !important;
     --zen-compact-float: var(--zen-element-separation);
 
-    /* was @media (-moz-mac-tahoe-theme) — macOS Tahoe only; gate via [data-platform] on Chromium. */
+    /* was @media (legacy-mac-tahoe-theme) — macOS Tahoe only; gate via [data-platform] on Chromium. */
 
     :root[zen-no-padding='true'] & {
       --zen-compact-float: 10px;
@@ -81,7 +81,7 @@
       :root:not([zen-single-toolbar='true']) & {
         bottom: calc(var(--zen-compact-float) / 2);
         height: calc(100% - var(--zen-toolbar-height-with-bookmarks));
-        /* was @media -moz-pref('zen.view.compact.hide-toolbar') — gate via [data-zen-...] attr. */
+        /* was @media legacy-pref('zen.view.compact.hide-toolbar') — gate via [data-zen-...] attr. */
         @media all {
           height: calc(100% - var(--zen-compact-top-toolbar-hidden-fix, 0px));
         }
@@ -103,7 +103,7 @@
   /* When we have multiple toolbars and the top-toolbar is NOT being hidden,
    * we need to adjust the top-padding of the toolbox to account for the
    * extra toolbar height. */
-  /* was @media not -moz-pref('zen.view.compact.hide-toolbar') — gate via [data-zen-...] attr. */
+  /* was @media not legacy-pref('zen.view.compact.hide-toolbar') — gate via [data-zen-...] attr. */
   @media all {
     &:not([zen-single-toolbar='true']) {
       #navigator-toolbox:not([animate='true']) {

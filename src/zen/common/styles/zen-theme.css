@@ -152,7 +152,7 @@
   --tabstrip-inner-border: transparent;
 
   --zen-toolbar-height: 38px;
-  /* was @media (-moz-platform: macos) — gate via [data-platform="macos"]. */
+  /* was @media (legacy-platform: macos) — gate via [data-platform="macos"]. */
 
   --zen-toolbar-button-inner-padding: 6px;
   --toolbarbutton-padding-outer: 4px;
@@ -168,7 +168,7 @@
     transparent
   ) !important;
   --zen-toolbar-button-size: 16px;
-  /* was @media (-moz-platform: macos) (--zen-toolbar-button-size: 17px) — gate via [data-platform]. */
+  /* was @media (legacy-platform: macos) (--zen-toolbar-button-size: 17px) — gate via [data-platform]. */
 
   /* Using a semitransparent background preserves the tinting from the backdrop.
     * Note that the toolbar text color from browser-colors.css should be ok,
@@ -214,7 +214,7 @@
   --urlbar-margin-inline: 1px !important;
 
   --zen-squircle-value: 1.3;
-  /* was @media (-moz-platform: windows) (--zen-squircle-value: 2.3) — gate via [data-platform]. */
+  /* was @media (legacy-platform: windows) (--zen-squircle-value: 2.3) — gate via [data-platform]. */
 
   --tab-icon-overlay-stroke: light-dark(white, black) !important;
   --tab-close-button-padding: 4px !important;
@@ -279,21 +279,21 @@
   );
 
   /** Other theme-related styles */
-  /* was @media (-moz-platform: macos) font stack — Chromium: system-ui stack below applies. */
+  /* was @media (legacy-platform: macos) font stack — Chromium: system-ui stack below applies. */
 
-  /* was @media (-moz-platform: windows) Segoe UI stack — gate via [data-platform="windows"]. */
+  /* was @media (legacy-platform: windows) Segoe UI stack — gate via [data-platform="windows"]. */
 }
 
 #main-window[windowtype="navigator:browser"]:not([chromehidden~='toolbar']) {
   min-height: 495px !important;
 
-  /* was @media (-moz-windows-mica) or (-moz-platform: macos) or ((-moz-platform: linux) and -moz-pref('zen.widget.linux.transparency')).
+  /* was @media (legacy-windows-mica) or (legacy-platform: macos) or ((legacy-platform: linux) and legacy-pref('zen.widget.linux.transparency')).
      Chromium: transparency via backdrop-filter / [data-platform] gate. */
   @media all {
     background: transparent;
     --zen-themed-toolbar-bg-transparent: transparent;
 
-    /* was @media (-moz-windows-mica) and (not -moz-pref(...)) x2 — Windows Mica backdrop gate. */
+    /* was @media (legacy-windows-mica) and (not legacy-pref(...)) x2 — Windows Mica backdrop gate. */
     @media all {
       --zen-themed-toolbar-bg-transparent: rgba(255, 255, 255, 0.2);
     }
@@ -323,10 +323,10 @@
 @import url('schemes/light.inc.css');
 @import url('zen-buttons.css');
 @import url('squircle-exclusions.inc.css');
-/* Chromium: relative imports (were %include). Scheme selection moves to
+/* Chromium: relative imports (were include-directive). Scheme selection moves to
    [zen-should-be-dark-mode] + prefers-color-scheme gates. */
 
-/* was @media (-moz-pref('layout.css.corner-shape.enabled')) — corner-shape
+/* was @media (legacy-pref('layout.css.corner-shape.enabled')) — corner-shape
    support-gated on Chromium. */
 @media all {
   *:not(.no-squircles),

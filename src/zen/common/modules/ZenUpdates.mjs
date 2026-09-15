@@ -40,19 +40,19 @@ export default function checkForZenUpdates() {
         url: updateUrl.replace("%VERSION%", version),
         l10nId: "zen-sidebar-notification-updated",
         special: true,
-        icon: "chrome://browser/skin/zen-icons/sparkles.svg",
+        icon: "../assets/icons/sparkles.svg",
       },
       {
         url: "https://www.zen-browser.app/donate",
         l10nId: "zen-sidebar-notification-donate",
-        icon: "chrome://browser/skin/zen-icons/heart-circle-fill.svg",
+        icon: "../assets/icons/heart-circle-fill.svg",
       },
       {
         action: () => {
           notifyObservers(window, "restart-in-safe-mode");
         },
         l10nId: "zen-sidebar-notification-restart-safe-mode",
-        icon: "chrome://browser/skin/zen-icons/security-broken.svg",
+        icon: "../assets/icons/security-broken.svg",
         // Chromium: chrome.runtime.getURL("zen-icons/security-broken.svg").
       },
     ],

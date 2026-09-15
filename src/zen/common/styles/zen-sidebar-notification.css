@@ -69,7 +69,7 @@
   }
 
   & img {
-    /* was -moz-context-properties: fill, fill-opacity. */
+    /* was legacy-context-properties: fill, fill-opacity. */
     fill-opacity: 1;
     fill: currentColor;
     width: 14px;
@@ -129,7 +129,7 @@
       pointer-events: none;
       width: var(--size-item-small);
       height: var(--size-item-small);
-      /* was -moz-context-properties: fill, fill-opacity. */
+      /* was legacy-context-properties: fill, fill-opacity. */
       fill: var(--special-color, currentColor);
     }
   }

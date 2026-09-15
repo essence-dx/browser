@@ -3,10 +3,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // Utility to register JSWindowActors
 
-import { ActorManagerParent } from "resource://gre/modules/ActorManagerParent.sys.mjs";
+import { ActorManagerParent } from "../../adapters/gre.mjs";
 import { getStringPrefSync, getAppInfo } from "../../adapters/prefs.mjs";
-// Gecko JSWindowActors (resource:// actors below); Chromium: content scripts
-// via chrome.scripting — Lane 3 migrates mods/; this registry maps there.
+// Gecko actors (relative paths below); Chromium: content scripts
+// via scripting API — Lane 3 migrates mods/; this registry maps there.
 
 /**
  * Fission-compatible JSProcess implementations.
@@ -24,10 +24,10 @@ let JSPROCESSACTORS = {};
 let JSWINDOWACTORS = {
   ZenModsMarketplace: {
     parent: {
-      esModuleURI: "resource:///actors/ZenModsMarketplaceParent.sys.mjs",
+      esModuleURI: "../../mods/actors/ZenModsMarketplaceParent.sys.mjs",
     },
     child: {
-      esModuleURI: "resource:///actors/ZenModsMarketplaceChild.sys.mjs",
+      esModuleURI: "../../mods/actors/ZenModsMarketplaceChild.sys.mjs",
       events: {
         DOMContentLoaded: {},
       },
@@ -40,10 +40,10 @@ let JSWINDOWACTORS = {
   },
   ZenGlance: {
     parent: {
-      esModuleURI: "resource:///actors/ZenGlanceParent.sys.mjs",
+      esModuleURI: "../../glance/actors/ZenGlanceParent.sys.mjs",
     },
     child: {
-      esModuleURI: "resource:///actors/ZenGlanceChild.sys.mjs",
+      esModuleURI: "../../glance/actors/ZenGlanceChild.sys.mjs",
       events: {
         DOMContentLoaded: {},
         mousedown: {
@@ -64,10 +64,10 @@ let JSWINDOWACTORS = {
   },
   ZenWindowDrag: {
     parent: {
-      esModuleURI: "resource:///actors/ZenWindowDragParent.sys.mjs",
+      esModuleURI: "../../window-drag/actors/ZenWindowDragParent.sys.mjs",
     },
     child: {
-      esModuleURI: "resource:///actors/ZenWindowDragChild.sys.mjs",
+      esModuleURI: "../../window-drag/actors/ZenWindowDragChild.sys.mjs",
       events: {
         mousedown: {
           mozSystemGroup: true,
@@ -84,10 +84,10 @@ let JSWINDOWACTORS = {
 if (!getAppInfo().inSafeMode) {
   JSWINDOWACTORS.ZenBoosts = {
     parent: {
-      esModuleURI: "resource:///actors/ZenBoostsParent.sys.mjs",
+      esModuleURI: "../../boosts/actors/ZenBoostsParent.sys.mjs",
     },
     child: {
-      esModuleURI: "resource:///actors/ZenBoostsChild.sys.mjs",
+      esModuleURI: "../../boosts/actors/ZenBoostsChild.sys.mjs",
       events: {
         // Needed to let the actor be created, please don't remove
         // without checking if boosts still work without it, thanks <3

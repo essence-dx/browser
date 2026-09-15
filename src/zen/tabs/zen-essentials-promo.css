@@ -27,7 +27,7 @@ zen-essentials-promo {
   }
 
   & image {
-    /* was -moz-context-properties: fill — currentColor inheritance on Chromium. */
+    /* was legacy-context-properties: fill — currentColor inheritance on Chromium. */
     fill: currentColor;
     width: 18px;
     margin-bottom: 4px;

@@ -6,7 +6,7 @@
 
 @import url('windows-captions-fix-default.inc.css');
 @import url('windows-captions-fix-active.inc.css');
-/* Chromium: relative imports (were %include). Conditionally-applied contents
+/* Chromium: relative imports (were include-directive). Conditionally-applied contents
    noted at use sites below. */
 
 &:not([zen-single-toolbar='true']) {
@@ -14,7 +14,7 @@
     --zen-toolbox-top-align: var(--zen-element-separation);
   }
 
-  /* was @media -moz-pref('zen.view.compact.hide-tabbar') — gate via [data-zen-...] attr. */
+  /* was @media legacy-pref('zen.view.compact.hide-tabbar') — gate via [data-zen-...] attr. */
   @media all {
     & #titlebar {
       margin-top: var(--zen-element-separation) !important;

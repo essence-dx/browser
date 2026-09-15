@@ -92,7 +92,7 @@ body,
     position: absolute;
     inset: 0;
     background-image: url(../../zen-images/grain-bg.png);
-    /* Chromium: relative asset path (was chrome://...). */
+    /* Chromium: relative asset path (was chromium-url/...). */
     pointer-events: none;
     z-index: 1;
   }
@@ -146,9 +146,9 @@ body,
    * with firefox's rendering of the tab bar */
 
   /* stylelint-disable-next-line media-query-no-invalid */
-  /* was @media (-moz-pref("zen.view.grey-out-inactive-windows")) — gate via [data-zen-...] attr. */
+  /* was @media (legacy-pref("zen.view.grey-out-inactive-windows")) — gate via [data-zen-...] attr. */
   @media all {
-    /* was &:-moz-window-inactive — Chromium: .zen-window-inactive class set by JS. */
+    /* was &:legacy-window-inactive — Chromium: .zen-window-inactive class set by JS. */
     &.zen-window-inactive {
       background: InactiveCaption;
     }
@@ -159,7 +159,7 @@ body,
   }
 
   /* stylelint-disable-next-line media-query-no-invalid */
-  /* was @media (-moz-windows-accent-color-in-titlebar) and ((-moz-windows-mica) or -moz-pref(...)) — Windows accent/Mica only. */
+  /* was @media (legacy-windows-accent-color-in-titlebar) and ((legacy-windows-mica) or legacy-pref(...)) — Windows accent/Mica only. */
   @media all {
     background: ActiveCaption;
     color: CaptionText;
@@ -196,14 +196,14 @@ body,
   gap: var(--zen-element-separation);
 }
 
-/* was @media not (-moz-platform: macos) — gate non-macOS via [data-platform] on Chromium. */
+/* was @media not (legacy-platform: macos) — gate non-macOS via [data-platform] on Chromium. */
 @media all {
   .titlebar-buttonbox-container {
     height: 100%;
   }
 }
 
-/* was @media (-moz-platform: macos) — gate macOS via [data-platform="macos"] on Chromium. */
+/* was @media (legacy-platform: macos) — gate macOS via [data-platform="macos"] on Chromium. */
 @media all {
   .titlebar-buttonbox-container {
     margin-inline-end: 8px;
@@ -215,14 +215,14 @@ body,
   }
 
   /* stylelint-disable-next-line media-query-no-invalid */
-  /* was -moz-pref("zen.widget.mac.mono-window-controls") — gate via [data-zen-...] attr. */
+  /* was legacy-pref("zen.widget.mac.mono-window-controls") — gate via [data-zen-...] attr. */
   @media all {
     :root:not([window-modal-open="true"]) .titlebar-buttonbox-container {
       color: var(--toolbox-textcolor);
 
       --zen-traffic-light-size: 6px;
 
-      /* was @media (-moz-mac-tahoe-theme) — macOS Tahoe only. */
+      /* was @media (legacy-mac-tahoe-theme) — macOS Tahoe only. */
       @media all {
         --zen-traffic-light-size: 7px;
       }
@@ -233,7 +233,7 @@ body,
       background-size: var(--icon-size-medium) 22px;
       background-position: 53% 50%;
 
-      /* was @media (-moz-mac-tahoe-theme) — macOS Tahoe only. */
+      /* was @media (legacy-mac-tahoe-theme) — macOS Tahoe only. */
       @media all {
         background-size: 23px 22px;
         background-position: 52% 50%;
@@ -246,7 +246,7 @@ body,
   }
 }
 
-/* was @media (-moz-platform: macos) — gate macOS via [data-platform="macos"] on Chromium. */
+/* was @media (legacy-platform: macos) — gate macOS via [data-platform="macos"] on Chromium. */
 @media all {
   :root[zen-window-buttons-reversed="true"][zen-right-side="true"] .titlebar-buttonbox-container {
     margin-inline-start: max(calc(var(--zen-element-separation) - 3px), 4px);
@@ -357,7 +357,7 @@ body,
 
 /* See #14409: firefox 150's body paint containment prevents the right side compact
  sidebar from remaining active at the screen edge in macOS fullscreen */
-/* was @media (-moz-platform: macos) — gate macOS via [data-platform="macos"] on Chromium. */
+/* was @media (legacy-platform: macos) — gate macOS via [data-platform="macos"] on Chromium. */
 @media all {
   :root[macOSNativeFullscreen][zen-compact-mode][zen-right-side] body {
     contain: none;

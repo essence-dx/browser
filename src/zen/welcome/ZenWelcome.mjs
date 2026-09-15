@@ -5,8 +5,7 @@
 import { parseXULFragment, insertFTLIfNeeded } from "../adapters/xul.mjs";
 import { getSelectedTabSync, addTab, setIcon } from "../adapters/tabs.mjs";
 import { recordHistoryVisit } from "../adapters/session.mjs";
-import { TabStateCache } from "resource:///modules/sessionstore/TabStateCache.sys.mjs";
-import { SearchService as SearchServiceModule } from "moz-src:///toolkit/components/search/SearchService.sys.mjs";
+import { TabStateCache, SearchService as SearchServiceModule, MigrationUtils } from "../adapters/gre.mjs";
 // Gecko now (tab strip/Places utils/TabStateCache/MigrationUtils below);
 // Chromium: chrome.tabs/create, chrome.history, chrome.storage.session,
 // chrome.i18n — wire when surfer.json migration.engine === "chromium".
@@ -65,7 +64,7 @@ import { SearchService as SearchServiceModule } from "moz-src:///toolkit/compone
     const XUL = `
       <html:video id="zen-welcome-video" autoplay="" loop="" muted=""
                     disablepictureinpicture="" tabindex="-1"
-                    src="chrome://browser/content/zen-videos/welcome-background.mp4"></html:video>
+                    src="../assets/videos/welcome-background.mp4"></html:video>
       <!-- Chromium: chrome.runtime.getURL("zen-videos/welcome-background.mp4") -->
       <html:div id="zen-welcome">
         <html:div id="zen-welcome-start">
@@ -364,7 +363,7 @@ import { SearchService as SearchServiceModule } from "moz-src:///toolkit/compone
           createLazyBrowser: true,
         });
         const icon = await getIconData(
-          `chrome://browser/content/zen-images/favicons/${app.icon}.svg`
+          `../assets/images/favicons/${app.icon}.svg`
         );
         // Update the persistent tab state cache with |tabData| information.
         TabStateCache.update(tab.linkedBrowser.permanentKey, {
@@ -603,7 +602,7 @@ import { SearchService as SearchServiceModule } from "moz-src:///toolkit/compone
             button.dataset.url = app.url;
             button.style.setProperty(
               "--zen-welcome-app-icon",
-              `url("chrome://browser/content/zen-images/favicons/${app.icon}.svg")`
+              `url("../assets/images/favicons/${app.icon}.svg")`
             );
             button.style.setProperty("--zen-welcome-app-color", app.color);
             button.toggleAttribute(

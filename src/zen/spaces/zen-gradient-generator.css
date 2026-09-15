@@ -71,7 +71,7 @@
   padding: 0 var(--panel-padding);
 
   @media all {
-    /* was (-moz-platform: macos) — gate via [data-platform="macos"]. */
+    /* was (legacy-platform: macos) — gate via [data-platform="macos"]. */
     gap: 2rem;
   }
 
@@ -84,7 +84,7 @@
     font-weight: 600;
     margin-inline: 0;
     margin-bottom: 2px;
-    /* was @media (-moz-platform: macos) — gate via [data-platform="macos"]. */
+    /* was @media (legacy-platform: macos) — gate via [data-platform="macos"]. */
   }
 }
 
@@ -224,7 +224,7 @@
   padding: 0 5px;
 
   &::-webkit-slider-thumb {
-    /* was ::-moz-range-thumb — Chromium slider pseudo-element. */
+    /* was ::legacy-range-thumb — Chromium slider pseudo-element. */
     background: light-dark(black, white);
     border-radius: 999px;
     height: var(--zen-thumb-height);
@@ -241,12 +241,12 @@
   }
 
   &::-webkit-slider-runnable-track {
-    /* was ::-moz-range-track. */
+    /* was ::legacy-range-track. */
     border-radius: 999px;
     height: 18px;
   }
 
-  /* was ::-moz-range-progress — Chromium uses -webkit-slider-runnable-track fill. */
+  /* was ::legacy-range-progress — Chromium uses -webkit-slider-runnable-track fill. */
   &::after {
     background: transparent;
   }
@@ -364,7 +364,7 @@
 }
 
 /* stylelint-disable-next-line media-query-no-invalid */
-/* was @media not -moz-pref("zen.theme.gradient.show-custom-colors") — gate via [data-zen-...] attr. */
+/* was @media not legacy-pref("zen.theme.gradient.show-custom-colors") — gate via [data-zen-...] attr. */
 @media not all {
   #PanelUI-zen-gradient-generator-custom-colors {
     display: none !important;
@@ -376,7 +376,7 @@
   height: 5rem;
   position: relative;
 
-  /* was @media (-moz-platform: macos) — gate via [data-platform="macos"]. */
+  /* was @media (legacy-platform: macos) — gate via [data-platform="macos"]. */
 
   &::after {
     content: "";
@@ -396,7 +396,7 @@
 
   &::before {
     background-image: url(../zen-images/grain-bg.png);
-    /* Chromium: relative asset path (was chrome://...). */
+    /* Chromium: relative asset path (was chromium-url/...). */
     opacity: var(--zen-grainy-background-opacity, 0);
     mix-blend-mode: hard-light;
     width: 60%;

@@ -2612,7 +2612,7 @@ class nsZenWorkspaces {
         "Default";
       name = this.isPrivateWindow ? "Incognito" : label;
       if (this.isPrivateWindow) {
-        icon = "chrome://browser/skin/zen-icons/private-window-small.svg";
+        icon = "../assets/icons/private-window-small.svg";
         // Chromium: chrome.runtime.getURL("zen-icons/private-window-small.svg").
       }
     }

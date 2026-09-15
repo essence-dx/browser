@@ -5,7 +5,7 @@
 "use strict";
 
 /* INCLUDE THIS FILE AS:
- *   <script src="chrome://browser/content/zenThemeModifier.js"></script>
+ *   <script src="../zenThemeModifier.js"></script>
  *   (Gecko path; Chromium: extension page script via chrome.runtime.getURL)
  *
  * FOR ANY WEBSITE THAT WOULD NEED TO USE THE ACCENT COLOR, ETC
@@ -53,7 +53,8 @@ import { getSelectedTabSync } from "../adapters/tabs.mjs";
      */
     init() {
       this._inMainBrowserWindow =
-        window.location.href == "chrome://browser/content/browser.xhtml";
+        window.location.href.includes("browser") ||
+        window.location.protocol.startsWith("chrome-extension");
       this.listenForEvents();
       this.updateAllThemeBasics();
     },
@@ -121,10 +122,10 @@ import { getSelectedTabSync } from "../adapters/tabs.mjs";
       // otherwise, use the custom value
       if (borderRadius == -1) {
         if (isMacOS) {
-          const targetRadius = window.matchMedia("(-moz-mac-tahoe-theme)")
-            .matches
-            ? 12
-            : 10;
+          const targetRadius =
+            document.documentElement.getAttribute("data-platform") === "macos"
+              ? 12
+              : 10;
           document.documentElement.style.setProperty(
             "--zen-border-radius",
             targetRadius + "px"
@@ -133,7 +134,7 @@ import { getSelectedTabSync } from "../adapters/tabs.mjs";
           // Linux uses GTK CSD titlebar radius, default to 8px
           document.documentElement.style.setProperty(
             "--zen-border-radius",
-            "env(-moz-gtk-csd-titlebar-radius, 8px)"
+            "8px"
           );
         } else {
           // Windows defaults to 8px

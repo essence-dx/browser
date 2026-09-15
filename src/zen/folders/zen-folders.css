@@ -17,7 +17,7 @@ zen-folder {
   --zen-folder-front-bgcolor: light-dark(color-mix(in srgb, var(--zen-primary-color), white 70%), color-mix(in srgb, var(--zen-primary-color), black 40%));
   --zen-folder-stroke: light-dark(color-mix(in srgb, var(--zen-primary-color) 50%, black), color-mix(in srgb, var(--zen-colors-primary) 15%, #ebebeb));
 
-  -webkit-app-region: no-drag; /* was -moz-window-dragging */
+  -webkit-app-region: no-drag; /* was legacy-window-dragging */
   transition: var(--zen-tabbox-element-indent-transition);
 
   :root[zen-sidebar-expanded="true"] & {
@@ -109,7 +109,7 @@ zen-folder {
 
         & image {
           fill-opacity: 0.9;
-          /* was -moz-context-properties: fill, fill-opacity. */
+          /* was legacy-context-properties: fill, fill-opacity. */
           fill: color-mix(in srgb, var(--zen-folder-stroke) 50%, currentColor);
           transform: translate(8.5px, 10.5px);
         }
@@ -200,7 +200,7 @@ zen-folder {
 
     .tab-reset-button[live-folder-action] {
       list-style-image: url("../zen-icons/security-broken.svg");
-      /* Chromium: relative asset path (was chrome://...). */
+      /* Chromium: relative asset path (was chromium-url/...). */
       display: flex;
       opacity: 1;
     }
@@ -269,7 +269,7 @@ zen-folder[collapsed] > .tab-group-container {
   width: var(--size-item-small);
   height: var(--size-item-small);
   margin: 10px 2px 10px 10px;
-  /* was -moz-context-properties: fill. */
+  /* was legacy-context-properties: fill. */
   fill: currentColor;
   opacity: 0.7;
 }
@@ -281,7 +281,7 @@ zen-folder[collapsed] > .tab-group-container {
   margin-inline-end: 10px;
   margin-inline-start: 4px;
   fill: currentColor;
-  /* was -moz-context-properties: fill. */
+  /* was legacy-context-properties: fill. */
 }
 
 .folders-tabs-list-item-labels {

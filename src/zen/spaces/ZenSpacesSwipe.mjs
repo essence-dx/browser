@@ -178,7 +178,7 @@ export class ZenSpacesSwipe {
     }
     event.preventDefault();
     event.stopPropagation();
-    const isRTL = document.documentElement.matches(":-moz-locale-dir(rtl)");
+    const isRTL = document.documentElement.matches('[dir="rtl"]');
     const moveForward =
       (event.direction === SimpleGestureEvent.DIRECTION_RIGHT) !== isRTL;
 

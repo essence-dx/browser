@@ -1293,15 +1293,17 @@ export class nsZenThemePicker extends nsZenMultiWindowFeature {
   }
 
   get isMica() {
-    return window.matchMedia("(-moz-windows-mica)").matches;
+    return (
+      document.documentElement.getAttribute("data-platform") === "windows" &&
+      window.matchMedia("(prefers-contrast: no-preference)").matches
+    );
   }
 
   get canBeTransparent() {
     return (
       this.isMica ||
-      window.matchMedia(
-        '(-moz-platform: macos) or ((-moz-platform: linux) and -moz-pref("zen.widget.linux.transparency"))'
-      ).matches
+      document.documentElement.getAttribute("data-platform") === "macos" ||
+      document.documentElement.getAttribute("data-platform") === "linux"
     );
   }
 

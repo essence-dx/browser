@@ -2,11 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { html } from "chrome://global/content/vendor/lit.all.mjs";
-import { MozLitElement } from "chrome://global/content/lit-utils.mjs";
-// Gecko Lit (chrome://global vendor); Chromium: npm lit + HTMLElement base —
-// swap these two imports and the MozLitElement base when migration.engine
-// === "chromium".
+import { html, MozLitElement } from "../../adapters/lit.mjs";
+// Gecko vendor lit now via adapters/lit.mjs shim; Chromium: npm lit +
+// HTMLElement base — see adapters/lit.mjs when migration.engine is chromium.
 
 const lazy = {};
 
@@ -91,7 +89,7 @@ class ZenSidebarNotification extends MozLitElement {
     return html`
       <link
         rel="stylesheet"
-        href="chrome://browser/content/zen-styles/zen-sidebar-notification.css"
+        href="../styles/zen-sidebar-notification.css"
       />
       <div class="zen-sidebar-notification-header">
         <label
@@ -103,7 +101,7 @@ class ZenSidebarNotification extends MozLitElement {
           class="zen-sidebar-notification-close-button"
           @click=${() => this.remove()}
         >
-          <img src="chrome://browser/skin/zen-icons/close.svg" />
+          <img src="../assets/icons/close.svg" />
         </div>
       </div>
       ${

@@ -7,13 +7,13 @@
 @font-face {
   font-family: "Zen-Junicode";
   src: url("../../zen-fonts/JunicodeVF-Roman.woff2") format("woff2");
-  /* Chromium: relative font path (was chrome://...). */
+  /* Chromium: relative font path (was chromium-url/...). */
 }
 
 @font-face {
   font-family: "Zen-Junicode-Italic";
   src: url("../../zen-fonts/JunicodeVF-Italic.woff2") format("woff2");
-  /* Chromium: relative font path (was chrome://...). */
+  /* Chromium: relative font path (was chromium-url/...). */
 }
 
 .zen-branding-title {

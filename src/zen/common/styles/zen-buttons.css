@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-/* Chromium: HTML parsing needs no XUL namespaces (were @namespace html/xul).
+/* Chromium: HTML parsing needs no XUL namespaces (were namespace-rule html/xul).
    xul|button below becomes plain button. */
 
 /** This file is used to override UI inside "common-shared.css" */
@@ -29,7 +29,7 @@ dialog::part(dialog-button) {
   border-radius: calc(10px * var(--zen-squircle-value));
 }
 
-/* was @media (-moz-platform: macos) — gate macOS via [data-platform="macos"] on Chromium. */
+/* was @media (legacy-platform: macos) — gate macOS via [data-platform="macos"] on Chromium. */
 @media all {
   dialog[defaultButton="accept"]::part(dialog-button) {
     &:is([dlgtype="accept"], [dlgtype="cancel"]) {

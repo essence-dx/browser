@@ -18,7 +18,7 @@ import { loadVendorScript } from "../../adapters/xul.mjs";
 import { ZenProgressBar } from "../sys/ui/ZenProgressBar.sys.mjs";
 import { ZenSpaceRoutingNavigation } from "../sys/ui/ZenSpaceRoutingNavigation.sys.mjs";
 // Gecko now; Chromium: chrome.storage.local — same adapter surface.
-// Welcome loader below uses a relative path (was chrome://); Chromium loads
+// Welcome loader below uses a relative path (was chromium-url/); Chromium loads
 // the welcome module via chrome.runtime.getURL.
 
 class ZenStartup {
@@ -198,7 +198,7 @@ class ZenStartup {
       );
       loadVendorScript(
         "../../welcome/ZenWelcome.mjs",
-        // was: chrome://browser/content/zen-components/ZenWelcome.mjs
+        // was: ../ZenWelcome.mjs
         window
       );
     } else {
