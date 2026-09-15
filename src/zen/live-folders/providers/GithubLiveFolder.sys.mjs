@@ -2,12 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { nsZenLiveFolderProvider } from "resource:///modules/zen/ZenLiveFolder.sys.mjs";
+import { nsZenLiveFolderProvider } from "../ZenLiveFolder.sys.mjs";
 
 // Chromium migration (lane 3): prefs + tab open via adapters.
 // Gecko: prefs store / manager tab strip. Chromium: chrome.storage /
 // chrome.tabs (see src/zen/adapters/prefs.mjs, adapters/tabs.mjs).
-// Icon chrome:// URL below becomes an extension URL at the shell layer.
+// Icon chromium-url/ URL below becomes an extension URL at the shell layer.
 import { getBoolPrefSync } from "../../adapters/prefs.mjs";
 import { addTab, setSelectedTab } from "../../adapters/tabs.mjs";
 
@@ -141,7 +141,7 @@ export class nsGithubLiveFolderProvider extends nsZenLiveFolderProvider {
           id: `${pr.repoNameWithOwner}#${pr.number}`,
           title: pr.title,
           subtitle: pr.author.displayLogin,
-          icon: "chrome://browser/content/zen-images/favicons/github.svg",
+          icon: "../assets/images/favicons/github.svg",
           url: pr.permalink,
         });
       }
@@ -179,7 +179,7 @@ export class nsGithubLiveFolderProvider extends nsZenLiveFolderProvider {
         items.push({
           title,
           subtitle: author,
-          icon: "chrome://browser/content/zen-images/favicons/github.svg",
+          icon: "../assets/images/favicons/github.svg",
           url: new URL(titles[i].href, this.state.url),
           id: `${repo}${idMatch}`,
         });
@@ -228,7 +228,7 @@ export class nsGithubLiveFolderProvider extends nsZenLiveFolderProvider {
       items.push({
         title: link.textContent.trim(),
         subtitle: author,
-        icon: "chrome://browser/content/zen-images/favicons/github.svg",
+        icon: "../assets/images/favicons/github.svg",
         url: issueUrl.href,
         id: `${repo}#${number}`,
       });

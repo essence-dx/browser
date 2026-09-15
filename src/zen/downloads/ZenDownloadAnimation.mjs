@@ -5,7 +5,7 @@
 import {
   nsZenDOMOperatedFeature,
   nsZenMultiWindowFeature,
-} from "chrome://browser/content/zen-components/ZenCommonUtils.mjs";
+} from "../common/modules/ZenCommonUtils.mjs";
 import { getBoolPrefSync, getIntPrefSync } from "../adapters/prefs.mjs";
 import { parseXULFragment } from "../adapters/xul.mjs";
 
@@ -84,7 +84,7 @@ class nsZenDownloadAnimationElement extends HTMLElement {
       link.setAttribute("rel", "stylesheet");
       link.setAttribute(
         "href",
-        "chrome://browser/content/zen-styles/zen-download-arc-animation.css"
+        "../styles/zen-download-arc-animation.css"
       );
       this.shadowRoot.appendChild(link);
     } catch (error) {

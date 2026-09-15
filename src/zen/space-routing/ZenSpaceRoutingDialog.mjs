@@ -413,8 +413,8 @@ export class nsZenSpaceRoutingDialog {
       menuItem.setAttribute("value", id || text);
 
       if (iconPath) {
-        // Chromium: extension icon URL; chrome:// is Gecko-only.
-        if (iconPath.startsWith("chrome://")) {
+        // Extension/asset icon URL on both engines (relative asset path or scheme URL).
+        if (iconPath.includes("://") || iconPath.startsWith("../")) {
           menuItem.setAttribute("class", "menuitem-iconic");
           menuItem.setAttribute("image", iconPath);
         } else {

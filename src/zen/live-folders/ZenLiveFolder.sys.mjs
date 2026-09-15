@@ -5,9 +5,7 @@
 // Gecko: NetUtil channels + scriptSecurityManager principals + nsIHttpChannel.
 // Chromium: fetch() with cookies (see adapters/storage.mjs notes); channel
 // QueryInterface/Ci/Cr below stay until the fetch shell lands.
-import { NetUtil } from "resource://gre/modules/NetUtil.sys.mjs";
-import { DeferredTask } from "resource://gre/modules/DeferredTask.sys.mjs";
-import { NetworkHelper } from "resource://devtools/shared/network-observer/NetworkHelper.sys.mjs";
+import { NetUtil, DeferredTask, NetworkHelper } from "../adapters/gre.mjs";
 
 const lazy = { NetUtil, DeferredTask, NetworkHelper };
 

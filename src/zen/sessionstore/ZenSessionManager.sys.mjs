@@ -2,12 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { JSONFile } from "resource://gre/modules/JSONFile.sys.mjs";
-import { ZenLiveFoldersManager } from "resource:///modules/zen/ZenLiveFoldersManager.sys.mjs";
-import { PrivateBrowsingUtils } from "resource://gre/modules/PrivateBrowsingUtils.sys.mjs";
-import { SessionStartup } from "resource:///modules/sessionstore/SessionStartup.sys.mjs";
-import { TabStateFlusher } from "resource:///modules/sessionstore/TabStateFlusher.sys.mjs";
-import { DeferredTask } from "resource://gre/modules/DeferredTask.sys.mjs";
+import {
+  JSONFile,
+  PrivateBrowsingUtils,
+  DeferredTask,
+  SessionStartup,
+  TabStateFlusher,
+} from "../adapters/gre.mjs";
+import { ZenLiveFoldersManager } from "../live-folders/ZenLiveFoldersManager.sys.mjs";
 
 // Chromium migration (lane 3): prefs + session via adapters.
 // Legacy pref store / session backend map to storage / session adapters

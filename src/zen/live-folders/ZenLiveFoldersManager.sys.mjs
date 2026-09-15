@@ -2,13 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { JSONFile } from "resource://gre/modules/JSONFile.sys.mjs";
-import { setTimeout as timerSetTimeout } from "resource://gre/modules/Timer.sys.mjs";
-import { TabStateCache } from "resource:///modules/sessionstore/TabStateCache.sys.mjs";
-import { ZenWindowSync } from "resource:///modules/zen/ZenWindowSync.sys.mjs";
-import { FeatureCallout } from "resource:///modules/asrouter/FeatureCallout.sys.mjs";
-import { nsRssLiveFolderProvider } from "resource:///modules/zen/RssLiveFolder.sys.mjs";
-import { nsGithubLiveFolderProvider } from "resource:///modules/zen/GithubLiveFolder.sys.mjs";
+import { JSONFile, timerSetTimeout, TabStateCache, FeatureCallout } from "../adapters/gre.mjs";
+import { ZenWindowSync } from "../sessionstore/ZenWindowSync.sys.mjs";
+import { nsRssLiveFolderProvider } from "./providers/RssLiveFolder.sys.mjs";
+import { nsGithubLiveFolderProvider } from "./providers/GithubLiveFolder.sys.mjs";
 
 const lazy = {
   JSONFile,
@@ -43,7 +40,7 @@ Object.defineProperty(lazy, "l10n", {
 // Chromium migration (lane 3): observers + prefs + tabs via adapters.
 // Gecko: observer/prefs/tab-strip APIs. Chromium: chrome.events /
 // chrome.storage / chrome.tabs (see src/zen/adapters/observers.mjs, adapters/prefs.mjs,
-// adapters/tabs.mjs). Icon chrome:// URL below becomes an extension URL.
+// adapters/tabs.mjs). Icon chromium-url/ URL below becomes an extension URL.
 import { addObserver, removeObserver } from "../adapters/observers.mjs";
 import { getBoolPrefSync, setBoolPref } from "../adapters/prefs.mjs";
 import {
@@ -57,11 +54,11 @@ import {
 const DEFAULT_FETCH_INTERVAL = 30 * 60 * 1000;
 const providers = [
   {
-    path: "resource:///modules/zen/RssLiveFolder.sys.mjs",
+    path: "./providers/RssLiveFolder.sys.mjs",
     module: "nsRssLiveFolderProvider",
   },
   {
-    path: "resource:///modules/zen/GithubLiveFolder.sys.mjs",
+    path: "./providers/GithubLiveFolder.sys.mjs",
     module: "nsGithubLiveFolderProvider",
   },
 ];
@@ -310,7 +307,7 @@ class nsZenLiveFoldersManager {
         ]);
 
         label = message.attributes[0].value;
-        icon = "chrome://browser/skin/zen-icons/selectable/logo-github.svg";
+        icon = "../assets/icons/selectable/logo-github.svg";
         break;
       }
     }

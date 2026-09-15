@@ -5,7 +5,7 @@
 import {
   nsZenPreloadedFeature,
   nsZenMultiWindowFeature,
-} from "chrome://browser/content/zen-components/ZenCommonUtils.mjs";
+} from "../common/modules/ZenCommonUtils.mjs";
 
 // Chromium migration (lane 3): prefs + storage + session via adapters.
 // Legacy pref store / file helpers / session backend map to adapter modules.

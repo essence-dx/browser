@@ -3,7 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 # Browser global components initializing before UI startup
-category browser-before-ui-startup resource:///modules/zen/ZenWindowSync.sys.mjs ZenWindowSync.init
+category browser-before-ui-startup ../sessionstore/ZenWindowSync.sys.mjs ZenWindowSync.init
 
 # App shutdown consumers
-category browser-quit-application-granted resource:///modules/zen/ZenWindowSync.sys.mjs ZenWindowSync.uninit
+category browser-quit-application-granted ../sessionstore/ZenWindowSync.sys.mjs ZenWindowSync.uninit

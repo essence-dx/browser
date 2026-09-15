@@ -4,11 +4,13 @@
 
 /* eslint-disable consistent-return */
 
-import { BrowserWindowTracker } from "resource:///modules/BrowserWindowTracker.sys.mjs";
-import { TabStateFlusher } from "resource:///modules/sessionstore/TabStateFlusher.sys.mjs";
-import { TabStateCache } from "resource:///modules/sessionstore/TabStateCache.sys.mjs";
-import { PrivateBrowsingUtils } from "resource://gre/modules/PrivateBrowsingUtils.sys.mjs";
-import { RunState } from "resource:///modules/sessionstore/RunState.sys.mjs";
+import {
+  BrowserWindowTracker,
+  TabStateFlusher,
+  TabStateCache,
+  PrivateBrowsingUtils,
+  RunState,
+} from "../adapters/gre.mjs";
 
 // Chromium migration (lane 3): window/tab sync via adapters.
 // Legacy tracker + tab strip + observer bus map to windows/tabs/observer

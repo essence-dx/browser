@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import { nsZenLiveFolderProvider } from "resource:///modules/zen/ZenLiveFolder.sys.mjs";
+import { nsZenLiveFolderProvider } from "../ZenLiveFolder.sys.mjs";
 
 // Chromium migration (lane 3): feed parse + favicon via fetch/DOM.
 // Gecko: URL parsing + Places utils favicons + prompt dialog. Chromium: URL +

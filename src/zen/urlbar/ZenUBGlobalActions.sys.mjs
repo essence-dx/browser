@@ -47,52 +47,52 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-toggle-compact-mode",
     command: "cmd_zenCompactModeToggle",
-    icon: "chrome://browser/skin/zen-icons/sidebar.svg",
+    icon: "../assets/icons/sidebar.svg",
   },
   {
     l10nId: "zen-action-open-theme-picker",
     command: "cmd_zenOpenZenThemePicker",
-    icon: "chrome://browser/skin/zen-icons/edit-theme.svg",
+    icon: "../assets/icons/edit-theme.svg",
   },
   {
     l10nId: "zen-action-new-split-view",
     command: "cmd_zenNewEmptySplit",
-    icon: "chrome://browser/skin/zen-icons/split.svg",
+    icon: "../assets/icons/split.svg",
   },
   {
     l10nId: "zen-action-new-folder",
     command: "cmd_zenOpenFolderCreation",
-    icon: "chrome://browser/skin/zen-icons/folder.svg",
+    icon: "../assets/icons/folder.svg",
   },
   {
     l10nId: "zen-action-copy-current-url",
     command: "cmd_zenCopyCurrentURL",
-    icon: "chrome://browser/skin/zen-icons/link.svg",
+    icon: "../assets/icons/link.svg",
   },
   {
     l10nId: "zen-action-settings",
     command: window => window.openPreferences(),
-    icon: "chrome://browser/skin/zen-icons/settings.svg",
+    icon: "../assets/icons/settings.svg",
   },
   {
     l10nId: "zen-action-open-private-window",
     command: "Tools:PrivateBrowsing",
-    icon: "chrome://browser/skin/zen-icons/private-window.svg",
+    icon: "../assets/icons/private-window.svg",
   },
   {
     l10nId: "zen-action-open-new-window",
     command: "cmd_newNavigator",
-    icon: "chrome://browser/skin/zen-icons/window.svg",
+    icon: "../assets/icons/window.svg",
   },
   {
     l10nId: "zen-action-new-blank-window",
     command: "cmd_zenNewNavigatorUnsynced",
-    icon: "chrome://browser/skin/zen-icons/window.svg",
+    icon: "../assets/icons/window.svg",
   },
   {
     l10nId: "zen-action-pin-tab",
     command: "cmd_zenTogglePinTab",
-    icon: "chrome://browser/skin/zen-icons/pin.svg",
+    icon: "../assets/icons/pin.svg",
     isAvailable: window => {
       const tab = getSelectedTabSync(window);
       return !tab?.hasAttribute("zen-empty-tab") && !tab?.pinned;
@@ -101,7 +101,7 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-unpin-tab",
     command: "cmd_zenTogglePinTab",
-    icon: "chrome://browser/skin/zen-icons/unpin.svg",
+    icon: "../assets/icons/unpin.svg",
     isAvailable: window => {
       const tab = getSelectedTabSync(window);
       return !tab?.hasAttribute("zen-empty-tab") && tab?.pinned;
@@ -110,11 +110,11 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-open-space-routing",
     command: "cmd_zenOpenSpaceRoutingSettings",
-    icon: "chrome://browser/skin/zen-icons/selectable/airplane.svg",
+    icon: "../assets/icons/selectable/airplane.svg",
   },
   {
     l10nId: "zen-action-new-boost",
-    icon: "chrome://browser/skin/zen-icons/boost.svg",
+    icon: "../assets/icons/boost.svg",
     isAvailable: window => {
       if (!isNotEmptyTab(window)) {
         return false;
@@ -157,7 +157,7 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-next-space",
     command: "cmd_zenWorkspaceForward",
-    icon: "chrome://browser/skin/zen-icons/forward.svg",
+    icon: "../assets/icons/forward.svg",
     isAvailable: window => {
       return window.gZenWorkspaces._workspaceCache.length > 1;
     },
@@ -165,7 +165,7 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-previous-space",
     command: "cmd_zenWorkspaceBackward",
-    icon: "chrome://browser/skin/zen-icons/back.svg",
+    icon: "../assets/icons/back.svg",
     isAvailable: window => {
       // This also covers the case of being in private mode
       return window.gZenWorkspaces._workspaceCache.length > 1;
@@ -174,7 +174,7 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-close-tab",
     command: "cmd_close",
-    icon: "chrome://browser/skin/zen-icons/close.svg",
+    icon: "../assets/icons/close.svg",
     isAvailable: window => {
       return isNotEmptyTab(window);
     },
@@ -182,27 +182,27 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-reload-tab",
     command: "Browser:Reload",
-    icon: "chrome://browser/skin/zen-icons/reload.svg",
+    icon: "../assets/icons/reload.svg",
   },
   {
     l10nId: "zen-action-reload-tab-without-cache",
     command: "Browser:ReloadSkipCache",
-    icon: "chrome://browser/skin/zen-icons/reload.svg",
+    icon: "../assets/icons/reload.svg",
   },
   {
     l10nId: "zen-action-next-tab",
     command: "Browser:NextTab",
-    icon: "chrome://browser/skin/zen-icons/forward.svg",
+    icon: "../assets/icons/forward.svg",
   },
   {
     l10nId: "zen-action-previous-tab",
     command: "Browser:PrevTab",
-    icon: "chrome://browser/skin/zen-icons/back.svg",
+    icon: "../assets/icons/back.svg",
   },
   {
     l10nId: "zen-action-capture-screenshot",
     command: "Browser:Screenshot",
-    icon: "chrome://browser/skin/zen-icons/screenshot.svg",
+    icon: "../assets/icons/screenshot.svg",
     isAvailable: window => {
       return isNotEmptyTab(window);
     },
@@ -210,7 +210,7 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-toggle-tabs-on-right",
     command: "cmd_zenToggleTabsOnRight",
-    icon: "chrome://browser/skin/zen-icons/sidebars-right.svg",
+    icon: "../assets/icons/sidebars-right.svg",
   },
   {
     l10nId: "zen-action-add-to-essentials",
@@ -223,7 +223,7 @@ const globalActionsTemplate = [
         !tab?.hasAttribute("zen-essential")
       );
     },
-    icon: "chrome://browser/skin/zen-icons/essential-add.svg",
+    icon: "../assets/icons/essential-add.svg",
   },
   {
     l10nId: "zen-action-remove-from-essentials",
@@ -231,12 +231,12 @@ const globalActionsTemplate = [
       window.gZenPinnedTabManager.removeEssentials(getSelectedTabSync(window)),
     isAvailable: window =>
       getSelectedTabSync(window)?.hasAttribute("zen-essential") ?? false,
-    icon: "chrome://browser/skin/zen-icons/essential-remove.svg",
+    icon: "../assets/icons/essential-remove.svg",
   },
   {
     l10nId: "zen-action-find-in-page",
     command: "cmd_find",
-    icon: "chrome://browser/skin/zen-icons/search-page.svg",
+    icon: "../assets/icons/search-page.svg",
     isAvailable: window => {
       return isNotEmptyTab(window);
     },
@@ -244,12 +244,12 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-manage-extensions",
     command: "Tools:Addons",
-    icon: "chrome://browser/skin/zen-icons/extension.svg",
+    icon: "../assets/icons/extension.svg",
   },
   {
     l10nId: "zen-action-switch-to-automatic-appearance",
     command: () => setIntPref("zen.view.window.scheme", 2),
-    icon: "chrome://browser/skin/zen-icons/sparkles.svg",
+    icon: "../assets/icons/sparkles.svg",
     isAvailable: () => {
       return lazy.currentTheme !== 2;
     },
@@ -257,7 +257,7 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-switch-to-light-mode",
     command: () => setIntPref("zen.view.window.scheme", 1),
-    icon: "chrome://browser/skin/zen-icons/face-sun.svg",
+    icon: "../assets/icons/face-sun.svg",
     isAvailable: () => {
       return lazy.currentTheme !== 1;
     },
@@ -265,7 +265,7 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-switch-to-dark-mode",
     command: () => setIntPref("zen.view.window.scheme", 0),
-    icon: "chrome://browser/skin/zen-icons/moon-stars.svg",
+    icon: "../assets/icons/moon-stars.svg",
     isAvailable: () => {
       return lazy.currentTheme !== 0;
     },
@@ -273,7 +273,7 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-print",
     command: "cmd_print",
-    icon: "chrome://browser/skin/zen-icons/print.svg",
+    icon: "../assets/icons/print.svg",
     isAvailable: window => {
       return isNotEmptyTab(window);
     },

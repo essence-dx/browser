@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { JSONFile } from "resource://gre/modules/JSONFile.sys.mjs";
+import { JSONFile } from "../adapters/gre.mjs";
 
 // Chromium migration (lane 3): context-menu injection + dialog via adapters.
 // Legacy element factory / tab strip / window lookup / dialog box map to
@@ -387,9 +387,9 @@ class nsZenSpaceRoutingManager {
    */
   async openSpaceRoutingDialog(parentWindow) {
     // Chromium: chrome.windows.create({url: <extension space-routing page>});
-    // gDialogBox + chrome:// xhtml below stay until the shell page lands.
+    // gDialogBox + chromium-url/ xhtml below stay until the shell page lands.
     await parentWindow.gDialogBox.open(
-      "chrome://browser/content/zen-components/windows/zen-space-routing.xhtml",
+      "./zen-space-routing.xhtml",
       {
         features: "resizable=no",
         sizeTo: "available",
