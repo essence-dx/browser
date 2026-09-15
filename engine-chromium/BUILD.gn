@@ -1,0 +1,99 @@
+# Zen Chromium build (GN) — Views + chrome.* equivalents for Gecko patches.
+# Each source_set below corresponds to rows in patches-mapping.md (125 patches).
+# Shell boots shell/tabs.html (tab 1 Chromium, tab 2 Gecko dual-boot).
+
+group("zen") {
+  deps = [
+    ":shell_window",
+    ":shell_tabs",
+    ":shell_theme",
+    ":shell_menus",
+    ":shell_toolbar",
+    ":shell_pages",
+    ":shell_options",
+    ":shell_omnibox",
+    ":shell_capture",
+    ":shell_newtab",
+    ":shell_compat",
+    ":shell_policy",
+    "//zen/adapters:tabs",
+    "//zen/adapters:windows",
+    "//zen/adapters:session",
+  ]
+}
+
+source_set("shell_window") {
+  sources = [
+    "shell/tabs.html",
+    "shell/shell.css",
+    "shell/dual-boot.js",
+  ]
+  deps = [ ":shell_tabs" ]
+}
+
+source_set("shell_tabs") {
+  sources = [
+    "shell/tabs.js",
+    "shell/splitview.js",
+    "shell/workspaces.js",
+  ]
+  deps = [ "//zen/adapters:tabs" ]
+}
+
+source_set("shell_theme") {
+  sources = [ "shell/shell.css" ]
+}
+
+source_set("shell_menus") {
+  sources = [ "shell/background.js" ]
+}
+
+source_set("shell_toolbar") {
+  sources = [
+    "shell/tabs.html",
+    "shell/tabs.js",
+  ]
+}
+
+source_set("shell_pages") {
+  sources = [ "shell/tabs.html" ]
+}
+
+source_set("shell_options") {
+  sources = [
+    "prefs.json",
+    "policy/policy.json",
+  ]
+}
+
+source_set("shell_omnibox") {
+  sources = [ "shell/background.js" ]
+}
+
+source_set("shell_capture") {
+  sources = [ "shell/background.js" ]
+}
+
+source_set("shell_newtab") {
+  sources = [ "shell/tabs.html" ]
+}
+
+source_set("shell_compat") {
+  sources = [ "shell/shell.css" ]
+}
+
+source_set("shell_policy") {
+  sources = [ "policy/policy.json" ]
+}
+
+source_set("shell_app") {
+  sources = [
+    "shell/tabs.html",
+    "manifest.json",
+  ]
+  deps = [ ":shell_window" ]
+}
+
+source_set("shell_actors") {
+  sources = [ "shell/background.js" ]
+}

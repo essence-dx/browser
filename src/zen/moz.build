@@ -13,6 +13,8 @@ EXTRA_PP_COMPONENTS += [
 # these files directly and this block is skipped via ZEN_MIGRATION_ENGINE.
 EXTRA_JS_MODULES.zen.adapters += [
   "adapters/engine.mjs",
+  "adapters/gre.mjs",
+  "adapters/lit.mjs",
   "adapters/observers.mjs",
   "adapters/prefs.mjs",
   "adapters/session.mjs",

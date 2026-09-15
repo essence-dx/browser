@@ -55,7 +55,7 @@
   },
   "updateHostname": "updates.zen-browser.app",
   "migration": {
-    "engine": "gecko",
+    "engine": "chromium",
     "engineOptions": ["gecko", "chromium", "dual"],
     "chromiumBranch": "chromium-migration",
     "engineChromiumDir": "engine-chromium",

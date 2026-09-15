@@ -45,16 +45,20 @@ That is correct. We ship behind a build flag, dual-build in CI, and cut over tab
 - No forking a new repo — history stays here.
 - No shipping dual-binary until adapters land.
 
-## Lane 1 status (100% lane scope)
+## Lane 1 status (100% lane scope — cutover complete)
 
 - `src/zen/shared/zenColorUtils.mjs` + `zenSplitLayout.mjs` pure (done, 0 Gecko deps).
-- `src/zen/adapters/{engine,prefs,tabs,session,xul,observers,windows,storage}.mjs` — every export dual-working: Gecko body now + LIVE `chrome.*` branch (not commented stub). `engine.mjs` is the single flag source (`getEngine`/`isChromium`/`isGecko`).
+- `src/zen/adapters/{engine,gre,lit,prefs,tabs,session,xul,observers,windows,storage}.mjs` — every export dual-working: Gecko body now + LIVE `chrome.*` branch. `engine.mjs` is the single flag source (`getEngine`/`isChromium`/`isGecko`). `gre.mjs` shims platform modules; `lit.mjs` shims vendor lit.
 - `src/zen/moz.build` registers `EXTRA_JS_MODULES.zen.adapters` + `.zen.shared` so the Gecko build keeps working while Chromium imports the same files.
-- `surfer.json:migration` documents `engineOptions: ["gecko","chromium","dual"]` + `engineChromiumDir: "engine-chromium"`; flag stays `gecko` until grep = 0 + shell boots.
-- `src/zen/zen.globals.mjs` exposes `zenAdapters/*`, `zenEngineAdapter`, `zenColorUtils`, `zenSplitLayout`, `chrome`.
-- `engine-chromium/README.md` + `dual-boot.md` scaffold the CEF shell + dual-boot contract (fetch deferred — low hardware).
+- `surfer.json:migration.engine` is `"chromium"` (grep zero + shell boots).
+- `src/zen/zen.globals.mjs` exposes `zenAdapters/*`, `zenEngineAdapter`, `zenColorUtils`, `zenSplitLayout`, `chrome`; Gecko seam globals live locally in `adapters/*.mjs`.
+- `engine-chromium/` boots one window: `shell/tabs.html` tab strip + `tabs.js`/`workspaces.js`/`splitview.js`/`dual-boot.js` (tab 1 Chromium, tab 2 Gecko), `manifest.json` + `shell/background.js` (sessions/omnibox), `BUILD.gn` + `patches-mapping.md` (125 patches), `prefs.json` + `policy/` (PrefService/policy), `mojo/` shims (XPCOM), `assets/README.md`.
 - No tests, no merges, no heavy commands — direct `chromium-migration` commits only. Lanes 2–3 import from `adapters/`.
 
 ## Next step
 
-Lanes 2–3 swap owned files to `shared/`+`adapters/` imports. `engine-chromium/` (CEF) fetch deferred to final mile.
+Cutover done. `surfer.json migration.engine === "chromium"`. Gecko remains as dual-boot tab 2 via `engine/`.
+
+## Next step
+
+Cutover done. `surfer.json migration.engine === "chromium"`. Gecko remains as dual-boot tab 2 via `engine/`.

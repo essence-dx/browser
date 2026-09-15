@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<!-- Zen Chromium shell — tab strip reusing vertical-tabs design. -->
+<!-- Tab 1 = Chromium guest, Tab 2 = Gecko fallback (dual-boot). -->
+<html data-platform="win" data-zen-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title>Zen Browser (Chromium)</title>
+  <link rel="stylesheet" href="../../src/zen/tabs/zen-tabs/vertical-tabs.css" />
+  <link rel="stylesheet" href="../../src/zen/spaces/zen-workspaces.css" />
+  <link rel="stylesheet" href="../../src/zen/common/styles/zen-theme.css" />
+  <link rel="stylesheet" href="./shell.css" />
+</head>
+<body>
+  <div id="zen-shell">
+    <div id="zen-tab-strip" role="tablist" aria-label="Vertical tabs">
+      <div id="zen-tabs-list"></div>
+      <button id="zen-new-tab" title="New tab">+</button>
+    </div>
+    <div id="zen-tab-views">
+      <!-- One webview per tab. Tab 1 boots Chromium, Tab 2 boots Gecko fallback. -->
+      <webview id="zen-view-1" src="about:blank" data-engine="chromium" style="flex:1"></webview>
+      <webview id="zen-view-2" src="about:blank" data-engine="gecko" style="flex:1;display:none"></webview>
+    </div>
+  </div>
+  <script type="module" src="./tabs.js"></script>
+  <script type="module" src="./workspaces.js"></script>
+  <script type="module" src="./splitview.js"></script>
+  <script type="module" src="./dual-boot.js"></script>
+</body>
+</html>

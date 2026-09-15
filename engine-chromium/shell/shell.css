@@ -1,0 +1,40 @@
+/* Zen Chromium shell styles — reuses CSS vars from src/zen. */
+:root {
+  --zen-shell-bg: #282a33;
+  --zen-tab-width: 64px;
+}
+
+#zen-shell {
+  display: flex;
+  flex-direction: row;
+  width: 100vw;
+  height: 100vh;
+  background: var(--zen-shell-bg);
+  overflow: hidden;
+}
+
+#zen-tab-strip {
+  width: var(--zen-tab-width);
+  display: flex;
+  flex-direction: column;
+  -webkit-app-region: drag;
+}
+
+#zen-tabs-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+#zen-tab-views {
+  flex: 1;
+  display: flex;
+}
+
+#zen-tab-views webview {
+  flex: 1;
+  min-width: 0;
+}
+
+#zen-new-tab {
+  -webkit-app-region: no-drag;
+}
