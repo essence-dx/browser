@@ -1,6 +1,8 @@
 # Disk reclaim plan — what is safe to delete on G:
 
-**Status:** scan only. **Nothing has been deleted.**
+**Status (2026-09-24):** scan only. **Nothing has been deleted.** G: now shows **55.60 GB free**
+(was 29 GB at scan time — gain is not from deletions, treat per-volume figures as stale until
+re-measured). Candidates below remain valid and unapproved.
 **Method:** `python3 .workbuddy-ai/scan_rebuildable.py` — read-only, prunes a directory once it
 is identified and sized. Full output: `.workbuddy-ai/scan-report.txt` (2,646 lines).
 
@@ -10,8 +12,10 @@ dirs visited: 945,148    unreadable: 8    candidates: 2,639    reported: 70.61 G
 
 ## Why this matters
 
-The Chromium lane needs **78 GB free on one volume** (28 checkout + 40 `out/` + 10 toolchain).
-G: currently has **29 GB** — 49 GB short. This scan is about closing that gap with things that
+The Chromium lane needs **78 GB free on one volume** (28 checkout + 40 `out/` + 10 toolchain;
+official Windows instructions: 100 GB+).
+G: currently has **55.60 GB** — **~22 GB short of the 78 GB minimum (~44 GB short of the
+official figure)**. This scan is about closing that gap with things that
 can be regenerated rather than lost.
 
 ## Totals by category
@@ -43,7 +47,9 @@ relationship likely adds a further ~4.79 GB, so the honest figure is:
 
 **Realistic reclaimable: 59–64 GB** (not 70.61 GB).
 
-Against a 49 GB shortfall that clears it, leaving roughly **10–15 GB of headroom** on G:. That
+Against today's ~22 GB shortfall (78 GB minimum) that clears it with roughly **35–40 GB of
+headroom** — comfortable for the minimum, still short of the 100 GB+ official figure
+(~44 GB gap) unless the larger candidates go too. That
 is workable but tight — Chromium's `out/` grows as you iterate.
 
 ## Biggest individual entries
@@ -87,7 +93,8 @@ rebuildable — they are deletions you already decided on. Worth clearing, but n
 ## Recommendation
 
 Clearing `node_modules` + `target/` + `.next` + venvs across `G:\Dx`, `G:\Essence`, `G:\HEXXED-*`,
-`G:\Trash` and `G:\ZZZ_*` is enough to clear the 49 GB shortfall with headroom, and every one of
+`G:\Trash` and `G:\ZZZ_*` is enough to clear today's ~22 GB shortfall with headroom (and gets
+close to the 100 GB+ official figure if taken in full), and every one of
 those is regenerable. Start with the 7.68 GB `src-tauri\target` and the 7.20 GB
 `plate\node_modules` — 14.88 GB from two paths, both rebuildable.
 

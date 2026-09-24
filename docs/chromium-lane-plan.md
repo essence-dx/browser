@@ -1,35 +1,39 @@
 # Chromium lane — plan and current state
 
 **Branch:** `chromium-migration`
-**Status:** scaffolding is real and committed; **the build is gated on disk.**
-**Last commit:** `f26a6a9`
+**Status:** scaffolding is real and committed; **the build is gated on disk — and on repairs (audit §3, TODO.md R1–R4).**
+**Last commit:** `01eb20c` (docs refresh pending; code HEAD for lane work)
 
 ---
 
-## 1. The gate: disk
+## 1. The gate: disk (re-measured 2026-09-24)
 
-`bash engine-chromium/preflight.sh` is the authority. Measured on this machine:
+`bash engine-chromium/preflight.sh` is the authority. Last full measurement vs today:
 
-| Gate | Requirement | Actual | Result |
+| Gate | Requirement | Actual (2026-09-24) | Result |
 |---|---|---|---|
-| Disk (single volume) | ≥ 78 GB free | G: **29 GB** | **FAIL — 49 GB short** |
+| Disk (single volume, lane-plan min) | ≥ 78 GB free | G: **55.60 GB** (was 29 GB) | **FAIL — ~22 GB short** |
+| Disk (official Chromium Windows) | ≥ 100 GB free | G: **55.60 GB** | **FAIL — ~44 GB short** |
 | depot_tools | present | not installed | **FAIL** (installable, ~1 GB) |
 | MSVC `cl.exe` | x64 | `G:\VS2022BuildTools` | OK |
 | Windows SDK | ≥ 10.0.22621 | 10.0.26100.0 | OK |
 | Python 3 | present | 3.13.14 | OK |
 | CPU / RAM | 8 cores / 16 GB | 12 cores / 23 GB | OK |
 
-Free space by volume: G: 29 GB, F: 7 GB, E: 4 GB, D: 3 GB, C: 1 GB — **44 GB total**.
+Previously (stale, kept for history): G: 29 GB, F: 7 GB, E: 4 GB, D: 3 GB, C: 1 GB — 44 GB total across volumes. Per-volume figures need a re-measure; what matters is unchanged: a checkout cannot span volumes, so the largest single drive decides.
 
-A checkout cannot span volumes, so what matters is the largest single drive: 29 GB.
+A checkout cannot span volumes, so what matters is the largest single drive: 55.60 GB today.
 Chromium needs ~28 GB for the source (`--no-history`), ~40 GB for `out/`, ~10 GB for
-toolchain and SDK — **78 GB minimum on one volume**.
+toolchain and SDK — **78 GB minimum on one volume** (official Windows instructions: 100 GB+).
 
 This is why `bootstrap.sh` calls `preflight.sh` first and aborts. A fetch that fills the
 system drive does not just fail the build; it takes the machine down.
 
-**To unblock:** free ~50 GB on one volume (G: is the obvious candidate), then
-`bash engine-chromium/bootstrap.sh`. Nothing else is missing.
+**To unblock:** land repairs R1–R4 first (TODO.md — building the current tree as-is burns
+hours and fails on dead asset paths), then free ~22 GB min (~44 GB for the official
+figure) on one volume (G: is the obvious candidate; `docs/disk-reclaim-plan.md` lists
+59–64 GB realistic reclaimable, nothing deleted yet), then
+`bash engine-chromium/bootstrap.sh`. Disk alone is no longer the only missing piece.
 
 ## 2. The architectural point that decides everything
 
@@ -104,7 +108,10 @@ dropped.
 
 ## 5. How to proceed
 
-1. Free ~50 GB on G:. **Do not delete `engine/` yet** — it is the Gecko fallback and the
+0. Land repairs R1–R4 (TODO.md): asset paths, `UrlbarShared` import, flag wiring, Gecko
+   fallback building from PowerShell. The audit (§6) is explicit: do not build the current
+   tree as-is.
+1. Free ~22 GB min (~44 GB for the official figure) on G:. **Do not delete `engine/` yet** — it is the Gecko fallback and the
    only tree that can currently run; it is also the only copy of the working browser.
 2. `bash engine-chromium/bootstrap.sh` — hours, and it will report progress.
 3. First build is expected to fail on `zen_layer.cc` / `zen_vertical_tab_strip.cc`: those
@@ -112,3 +119,7 @@ dropped.
    checkout exists. `zen_tab_model.*` should compile clean.
 4. Only after `chrome.exe` exists and boots is it meaningful to revisit
    `surfer.json:migration.engine` — which, today, **nothing reads**.
+5. CI: no `.circleci/` in repo (CI = `.github/workflows/`). If CircleCI cloud is used,
+   keep it to shell-only jobs (`gn check`, lint, mapping/prefs + asset-path checks);
+   full `chrome.exe` belongs on a self-hosted runner (200 GB+ SSD) or cloud VM with
+   Siso/REAPI — see PLAN.md.

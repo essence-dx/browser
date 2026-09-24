@@ -1,94 +1,90 @@
-# TODO — Chromium Migration: 100% Complete (3 Lanes, Main Task)
+# TODO — Chromium Migration (chromium-migration branch)
 
-**Branch:** `chromium-migration` from `dev@8df45e5` (FF 155.0.1)
-**Main task = 100%:** every Gecko call site swapped + shell boots + flag flips. No tests, no merges.
-**Status now (~10%):** 1820 Gecko API hits + 2056 protocol/CSS hits left in `src/zen` (~250 files); 258 patches untouched; XPCOM C++ untouched; `engine-chromium/` empty.
-**Done = 100%:** `grep Services\.|gBrowser\.|SessionStore\.|PlacesUtils\.|MozXULElement|createXULElement|ChromeUtils\.|XPCOMUtils\. src/zen --exclude-dir=adapters` = 0 AND `grep chrome://|resource://|-moz-|@namespace|%include` in migrated files = 0 AND `engine-chromium/` boots. Check a file only when its count = 0.
+**Branch:** `chromium-migration` from `dev@8df45e5` (FF 155.0.1), workdir `G:\Zen`
+**Verified 2026-09-24 (HEAD `01eb20c`):** app-layer grep is 0 BUT the audit holds — the tree does not run. Read the repair list (R1–R4) before any build attempt.
+**Scope rule (AGENTS.md):** 808 test files ignored. All counts below are app-only unless stated.
+**Authoritative detail docs:** `docs/chromium-migration-audit.md` (measured verdict), `docs/chromium-lane-plan.md` (disk gate + porting map), `docs/disk-reclaim-plan.md` (reclaim candidates), `docs/chromium-migration.md` (layer plan).
 
-## Phase 0 — Done (~10%)
+## Verified counts (2026-09-24, do not regress)
 
-- [x] Branch + `shared/zenColorUtils` + `shared/zenSplitLayout` pure
-- [x] `adapters/{prefs,tabs,session,xul,observers,windows,storage}.mjs` scaffold (Gecko body + commented stub — NOT YET working Chromium bodies)
-- [x] `surfer.json:migration.engine="gecko"` + docs
+- App `src/zen` excl `adapters/tests/@types/mochitests`: **0** `Services.|gBrowser.|SessionStore.|PlacesUtils.|MozXULElement|createXULElement|ChromeUtils.|XPCOMUtils.` hits — gate green
+- App `src/zen` excl `adapters/tests/@types/mochitests`: **0** `chrome://|resource://|-moz-|@namespace|%include` hits — gate green
+- Incl tests/types: **504** files with Gecko-API hits, **224** files with chrome-url/CSS hits — all under `src/zen/tests/`, `src/zen/mochitests/`, `src/zen/@types/` → **out of scope**, do not count as incomplete
+- `src/zen/adapters/`: **10** files (`engine,gre,lit,prefs,tabs,session,xul,observers,windows,storage`) with `chrome.*` branches — see R3 on what "working" actually means (no `chrome.*` provider exists in tree)
+- `surfer.json:migration.engine` = `"chromium"` — flipped, but decorative (see R3)
+- `engine-chromium/`: **31 files / ~106 KB** scaffold — **NOT booted** (README states "Not fetched yet — placeholder")
+- `src/browser`: **115** `.patch` still present (+10 `src/external-patches` = **125** mapped in `patches-mapping.md`) — mapped, **NOT rewritten** to Views
+- XPCOM/C++: ~20 files still in tree (`nsIZen*.idl`, `nsZen*.cpp`, `ZenShareInternal.cpp`, `ZenMouseTracker.cpp`, …) + 6 `engine-chromium/mojo/` shims alongside — **NOT deleted / NOT behind flag**
+- `src/zen/zen.globals.mjs`: exposes `zenAdapters/*` + `chrome` (good) BUT still lists `gBrowserInit/gBrowser*` allowlist entries — **NOT stripped**
+- Disk gate: `G:` **55.60 GB free** (was 29 GB at lane-plan time; nothing was deleted — do not treat the gain as reclaimed headroom). Full Chromium checkout+build needs **78 GB min on one volume** (lane-plan: 28 source no-history + 40 `out/` + 10 toolchain) and **100 GB+ official** (Windows build instructions). **Short ~22 GB vs min, ~44 GB vs official** — full build does NOT fit on G:.
 
-## Lane 1 — Foundation + Cutover (Agent 1) — 100% checklist
+## Audit repairs — MUST fix before building (docs/chromium-migration-audit.md §3, re-verified at HEAD)
 
-Owns: `surfer.json`, `src/zen/shared/**`, `src/zen/adapters/**`, `src/zen/zen.globals.mjs`, `docs/chromium-migration.md`, `engine-chromium/**`, `src/zen/moz.build`
+- [ ] R1 — **49 dead asset paths**: rewrites point at `src/zen/assets/…` and `src/zen/styles/…`, verified **both dirs do not exist** (`Test-Path False/False`). Examples: `spaces/ZenSpaceManager.mjs:2615` → `../assets/icons/private-window-small.svg` (real: `src/browser/themes/shared/zen-icons/nucleo/…`), `welcome/ZenWelcome.mjs:67,366,605` (video/favicons), `space-routing/zen-space-routing.inc.xhtml:23,33,38,44` (`../styles/…`, `../assets/icons/icons.css`), `downloads/zen-download-arc-animation.css`, `folders/ZenFolders.mjs`, `common/modules/ZenUpdates.mjs`, `urlbar/ZenUBGlobalActions.sys.mjs`. Fix: recreate `src/zen/assets/` OR re-point all 49 at `src/browser/themes/shared/zen-icons/` (audit option C).
+- [ ] R2 — **broken `UrlbarShared` use**: `common/modules/ZenUIManager.mjs:9` has the import **commented out**, line 504 still calls `UrlbarShared.RESULT_SOURCE.ZEN_ACTIONS` live. Fix: restore the import or route through `adapters/`.
+- [ ] R3 — **decorative flag**: `adapters/engine.mjs` does **not** read `surfer.json` (verified: no `surfer` reference in file; it sniffs live `Services`/`chrome` globals). `ZEN_MIGRATION_ENGINE` exists **only** in the `src/zen/moz.build` comment (verified: no other refs). `surfer.json` is mentioned in comments/docs across ~15 files but nothing wires `migration.engine` to behavior (lane-plan §5: "today, nothing reads" it). Fix: implement the flag read (build-time + runtime) or stop claiming cutover.
+- [ ] R4 — **Gecko fallback is unbuilt**: `engine/obj-*` holds only `CLOBBER`+`config.log` (no `dist/bin`, no exe); `mach` from Git Bash reports mingw64 (must run from PowerShell/MSVC env); `~/.mozbuild` unbootstrapped. Do NOT `mach build` the current tree as-is — R1/R2 live in files the Gecko build consumes (audit §6).
 
-- [x] `adapters/prefs.mjs` — every export has WORKING `chrome.storage` body behind flag (not comment)
-- [x] `adapters/tabs.mjs` — every export has WORKING `chrome.tabs`/`tabGroups` body
-- [x] `adapters/session.mjs` — WORKING `chrome.sessions`/`storage.session` body
-- [x] `adapters/xul.mjs` — WORKING `createElement`/`template` body (no `MozXULElement`)
-- [x] `adapters/observers.mjs` — WORKING `chrome.events`/`EventTarget` body
-- [x] `adapters/windows.mjs` — WORKING `chrome.windows` body
-- [x] `adapters/storage.mjs` — WORKING `chrome.storage` body
-- [x] `shared/` stays pure (0 Gecko hits) — verify
-- [x] `zen.globals.mjs` — remove `Services/gBrowser/MozXULElement/SessionStore/PlacesUtils` from allowlist
-- [x] `engine-chromium/` — CEF/WebView2 fetch + `BrowserView` tab strip + dual-boot (tab 1 Chromium, tab 2 Gecko)
-- [x] `surfer.json:migration.engine` → `"chromium"` (only when counts = 0 + shell boots)
-- [x] Verify: `grep` API count outside `adapters/` = 0
+## Phase 0 — Done
 
-## Lane 2 — UI Shell 100% (Agent 2) — per-file, check only at 0 hits
+- [x] Branch + `shared/zenColorUtils` + `shared/zenSplitLayout` pure (0 Gecko deps)
+- [x] `adapters/` bodies with `chrome.*` branches (see R3 caveat)
+- [x] App call-site swaps Lanes 2–3 (grep app-only = 0, with R1/R2 breakage noted above — gate green ≠ app working)
 
-Owns: `common/` (112/17), `tabs/` (42/2), `spaces/` (142/7), `compact-mode/` + `.cpp`/`.idl`, `split-view/` (69/1), `welcome/`, `media/`, `kbs/`, `folders/` (ZenFolders 54), `glance/`, owned CSS/XHTML/jar.mn. Counts = `Services|gBrowser|SessionStore|PlacesUtils|MozXULElement|createXULElement|ChromeUtils|XPCOMUtils` hits now.
+## Lane 1 — Foundation + Cutover (remaining gaps explicit)
 
-- [x] `common/zenThemeModifier.js` (9) + `ZenPreloadedScripts.js` (6) + `zen-sets.js` (7) + `jar.inc.mn` (1)
-- [x] `common/sys/ZenUIMigration.sys.mjs` (11) + `ZenCustomizableUI.sys.mjs` (2) + `ZenActorsManager.sys.mjs` (1)
-- [x] `common/modules/ZenCommonUtils.mjs` (5) + `ZenMenubar.mjs` (2) + `ZenStartup.mjs` (8) + `ZenUpdates.mjs` (4) + `ZenSidebarNotification.mjs` (2) + `ZenUIManager.mjs` (40)
-- [x] `common/sys/ui/ZenUIComponent.sys.mjs` (2) + `ZenProgressBar.sys.mjs` (5) + `ZenSpaceRoutingNavigation.sys.mjs` (3)
-- [x] `common/emojis/ZenEmojiPicker.mjs` (4)
-- [x] `tabs/ZenPinnedTabManager.mjs` (38) + `ZenEssentialsPromo.mjs` (4)
-- [x] `spaces/ZenSpaceManager.mjs` (88) + `ZenGradientGenerator.mjs` (24) + `ZenSpace.mjs` (10) + `ZenSpaceBookmarksStorage.js` (8) + `ZenSpaceCreation.mjs` (4) + `ZenSpaceIcons.mjs` (6) + `ZenSpacesSwipe.mjs` (2)
-- [x] `split-view/ZenViewSplitter.mjs` (69) — reuse `shared/zenSplitLayout`
-- [x] `compact-mode/ZenCompactMode.mjs` (17) + `ZenMouseTracker.cpp` (1) + `nsIZenMouseTracker.idl` → `IntersectionObserver` shim
-- [x] `folders/ZenFolders.mjs` (54) + `ZenFolder.mjs` (6)
-- [x] `glance/ZenGlanceManager.mjs` (25) + actors (5)
-- [x] `kbs/ZenKeyboardShortcuts.mjs` (6+) + `welcome/ZenWelcome.mjs` (7+) + `media/ZenMediaController.mjs` (2+)
-- [x] Owned CSS: `vertical-tabs.css` (19 `-moz-`), `zen-workspaces.css` (14), `zen-theme.css` (22), `zen-gradient-generator.css` (9), `zen-tabs.css` (8), `zen-split-view.css` (4), `zen-folders.css` (6), `zen-compact-mode.css` (6) + rest → standard CSS, 0 `-moz-|@namespace|%include`
-- [x] Owned XHTML/jar.mn: every `*.inc.xhtml` + `jar.inc.mn` → HTML `template`/custom elements
+- [x] `adapters/prefs,tabs,session,xul,observers,windows,storage,engine,gre,lit` — `chrome.*` branches present (R3: no provider in tree yet)
+- [x] `shared/` stays pure (0 Gecko hits)
+- [ ] `zen.globals.mjs` — strip `Services/gBrowser/MozXULElement/SessionStore/PlacesUtils` from allowlist (still contains `gBrowserInit/gBrowser*`)
+- [ ] `engine-chromium/` — real vendored `chromium/src` + `//zen` layer + `chrome.exe` booting one window (today: 31-file scaffold; `dual-boot.js` toggles `about:blank`; `BUILD.gn` valid since `f26a6a9` but uncompiled without a checkout). Correction to earlier notes: prebuilt CEF / WebView2 / Chrome-for-Testing give a **renderer only, no `chrome.*`** (lane-plan §2) — they can validate shell UI but NOT the adapter `chrome.tabs/sessions/omnibox` branches. Real `chrome.*` needs the source build.
+- [x] `surfer.json:migration.engine` = `"chromium"` (R3: decorative until the flag is wired; do not flip-flop, finish the wiring instead)
+- [x] App-only grep = 0 (tests/types excluded per scope; R1/R2 breakage is path-level, invisible to the grep)
 
-## Lane 3 — Services, Data, Patches 100% (Agent 3) — per-file, check only at 0 hits
+## Lane 2 — UI Shell (app grep DONE, repairs left)
 
-Owns: `boosts/`, `live-folders/`, `sync/`, `urlbar/`, `sessionstore/`, `space-routing/`, `mods/`, `toolkit/`, `drag-and-drop/`, `window-drag/`, `share/`, `downloads/`, `src/browser/**`, `src/external-patches/**`, `prefs/**`, `configs/**`, XPCOM IDL/CPP.
+- [x] `common/` (112/17), `tabs/` (42/2), `spaces/` (142/7), `split-view/` (69/1), `folders/` (60), `glance/` (25+), `kbs/welcome/media` (~15) → 0 app hits
+- [x] Owned CSS `-moz-/@namespace/%include` → standard CSS (app-only 0)
+- [x] Owned XHTML/jar.mn → relative/template imports (app-only 0, with R1 asset-dir gap)
+- [ ] R1 asset re-point (covers Lane 2 files: spaces, welcome, folders, common/ZenUpdates, downloads CSS, space-routing XHTML)
+- [ ] R2 `ZenUIManager` import fix
+- [ ] `compact-mode/ZenMouseTracker.cpp` + `nsIZenMouseTracker.idl` → keep compiling behind flag OR delete (`mojo/zen-mouse-tracker.mjs` shim exists alongside)
 
-- [x] `boosts/ZenBoostsManager.sys.mjs` + `ZenBoostsEditor.mjs` + `ZenBoostStyles.sys.mjs` + `ZenSelectorComponent.sys.mjs` + `ZenZap*.sys.mjs` + actors → `adapters/storage|session|prefs|observers` working calls (not comments)
-- [x] `live-folders/` (Manager 9, UI 9, providers 3+13) → adapters working calls
-- [x] `sync/ZenSpacesSync.sys.mjs` (2) + `ZenSpacesSyncApplier.sys.mjs` (27) + `ZenSpacesSyncModel.sys.mjs` (10) → `chrome.storage.sync`+`identity` working calls
-- [x] `urlbar/ZenSiteDataPanel.sys.mjs` (53) + `ZenUBGlobalActions.sys.mjs` (36) + `ZenUBActionsProvider.sys.mjs` (13) + `ZenUBProvider.sys.mjs` + `ZenUBResultsLearner.sys.mjs` → `chrome.omnibox` working calls
-- [x] `sessionstore/ZenSessionManager.sys.mjs` (17) + `ZenWindowSync.sys.mjs` (42) → `chrome.sessions` working calls
-- [x] `space-routing/ZenSpaceRoutingManager.sys.mjs` (9) + `ZenSpaceRoutingDialog.mjs` (39) → adapters working calls
-- [x] `mods/ZenMods.mjs` (12) + `nsIZenModsBackend.idl` + `ZenStyleSheetCache.cpp` → `chrome.scripting` working shim
-- [x] `drag-and-drop/ZenDragAndDrop.js` (38) + `nsIZenDragAndDrop.idl` + `nsZenDragAndDrop.cpp` → Mojo/drag shim or delete behind flag
-- [x] `window-drag/nsIZenWindowDragUtils.idl` + `nsZenWindowDragUtils.cpp` + actors (3+2) → Mojo shim or delete
-- [x] `boosts/nsZenBoostsBackend.cpp` + `toolkit/ZenShareInternal.cpp` + `compact-mode/ZenMouseTracker.cpp` (Lane 2 if needed) → shim or delete
-- [x] ALL 258 `src/browser/**/*.patch` + `toolkit/dom/layout` patches → `BUILD.gn` + Views file-by-file (rewrite, not log)
-- [x] `prefs/*.yaml` + `configs/` → Chromium `PrefService`/policy
-- [x] Owned CSS/XHTML (`zen-boosts.css` 16, `UBGlobalActions` CSS 33, etc.) → standard CSS, 0 `-moz-`
+## Lane 3 — Services, Data, Patches (app grep DONE, native/patches left)
 
-## Module Inventory (100% scope)
+- [x] `boosts/`, `live-folders/`, `sync/` (39), `urlbar/` (~100), `sessionstore/` (59), `space-routing/` (48) `.mjs` → adapters/`chrome.*` branches, 0 app hits
+- [x] Owned CSS/XHTML → 0 app hits
+- [x] `prefs.json` + `policy/policy.json` mapped (PrefService/policy equivalents exist in `engine-chromium/`)
+- [ ] `mods/nsIZenModsBackend.idl` + `ZenStyleSheetCache.cpp`, `drag-and-drop/nsIZenDragAndDrop.idl/.cpp`, `window-drag/nsIZen*.idl/.cpp`, `boosts/nsZenBoostsBackend.cpp`, `toolkit/ZenShareInternal.cpp` → Mojo/`chrome.scripting` shim OR delete behind flag (shims exist in `engine-chromium/mojo/`, originals still built)
+- [ ] `src/browser/**/*.patch` (115) + `src/external-patches` (10) → rewrite to `BUILD.gn` + Views file-by-file (today: `patches-mapping.md` table only, patches still applied on Gecko path; lane-plan §4 porting map is the spec, measured in months not hours)
+- [ ] `prefs/*.yaml` + `configs/` full cutover (mapped, Gecko files still present)
 
-| Lane | Module | Files | API hits now | Done when |
-|------|--------|-------|--------------|-----------|
-| 1 | `shared` + `adapters` | 9 | 0 in shared; adapters are seam | every export dual-working |
-| 2 | `common` | 17 | 112 | 0 |
-| 2 | `tabs` | 2 | 42 | 0 |
-| 2 | `spaces` | 7 | 142 | 0 |
-| 2 | `split-view` | 1 | 69 | 0 |
-| 2 | `compact-mode` | +cpp/idl | 17+ | 0 + shim compiles |
-| 2 | `folders` | 2 | 60 | 0 |
-| 2 | `glance` | +actors | 25+ | 0 |
-| 2 | `kbs/welcome/media` | 4 | ~15 | 0 |
-| 2 | owned CSS/XHTML | ~20 | ~100 `-moz-` | 0 |
-| 3 | `boosts` | 8 | ~25 | 0 |
-| 3 | `live-folders` | 5 | ~25 | 0 |
-| 3 | `sync` | 3 | 39 | 0 |
-| 3 | `urlbar` | 5 | ~100 | 0 |
-| 3 | `sessionstore` | 2 | 59 | 0 |
-| 3 | `space-routing` | 3 | 48 | 0 |
-| 3 | `mods/toolkit/drag/window-drag` | ~20 | ~60 + IDL/CPP | 0 + shim |
-| 3 | 258 patches | 258 | 13,582 lines | rewritten to GN |
-| — | `tests` | 808 | — | out of scope |
+## Module Inventory (verified)
 
-## Done = 100% (Hours of file work + shell)
+| Lane | Module | Files | App hits (verified) | State |
+|------|--------|-------|--------------------|-------|
+| 1 | `shared` + `adapters` | 10 | 0 in shared; adapters are seam w/ `chrome.*` branches | DONE w/ R3 caveat |
+| 2 | `common/tabs/spaces/split-view/folders/glance/kbs/welcome/media` | ~60 | 0 | DONE w/ R1+R2 repairs open |
+| 2 | owned CSS/XHTML | ~20 | 0 | DONE w/ R1 asset-dir gap |
+| 2 | `compact-mode` C++/.idl | 3 | n/a native | GAP — shim exists, original kept |
+| 3 | `boosts/live-folders/sync/urlbar/sessionstore/space-routing/mods/toolkit/drag/window-drag/share/downloads` `.mjs` | ~40 | 0 | DONE (grep) |
+| 3 | IDL/CPP/H | ~20 | n/a native | GAP — shims exist, originals kept |
+| 3 | patches | 125 (115+10) | 13k lines mapped | GAP — mapped, not rewritten |
+| — | `tests/@types/mochitests` | 808 scope-excluded | 504/224 files w/ hits | OUT OF SCOPE |
 
-Each lane commits `chore(migration): lane{N}: <file> <before>→0` directly to `chromium-migration`. No merges. 100% when every box above checked + shell boots + flag = `"chromium"`.
+## Build & CI path (corrected — lane-plan §2 is authoritative)
+
+- **Local G: full build: BLOCKED.** Need 78 GB min / 100 GB+ official on one volume; have 55.60 GB. `preflight.sh` aborts by design. See `docs/disk-reclaim-plan.md` (59–64 GB realistic reclaimable, nothing deleted yet).
+- **Prebuilt (fits today, shell-UI only):** Chrome-for-Testing snapshot (~500 MB) / prebuilt CEF (~1–2 GB) / WebView2 runtime — validates tab strip, workspaces, split-view, dual-boot UI. Does NOT validate adapter `chrome.*` branches (no `//chrome` layer → no `chrome.tabs/sessions/omnibox`).
+- **Real `chrome.*` validation:** vendor `chromium/src` (`bootstrap.sh`: `fetch --no-history` → `gclient sync` → overlay → `gn gen` → `autoninja`), `//zen` compiles against real headers (`zen_tab_model.*` expected clean; `zen_layer.*`/`zen_vertical_tab_strip.*` are sketches to fix against the tree), `chrome.exe` boots. Months-scale port per lane-plan §4.
+- **CircleCI:** no `.circleci/` in repo (CI today = `.github/workflows/`). Cloud Windows executors carry 200 GB disk (`medium` 4vCPU/16GB → `2xlarge` 32vCPU/128GB) so space fits, but a full Chromium build is 2–8 h + VS/SDK/depot_tools setup per run — heavy credit burn, likely job-timeout territory. Recommended split: CircleCI builds shell-only (`gn check`, lint, mapping/prefs validation, minutes); full `chrome.exe` build on a self-hosted runner (200 GB+ SSD, NTFS, AV-excluded) or cloud VM with remote execution (Siso/REAPI).
+
+## Done = 100% (ordered)
+
+1. R1–R4 repairs (days): asset paths live again, `UrlbarShared` fixed, flag wired, Gecko fallback builds from PowerShell — or formally adopt audit option A (revert path rewrites) / C (repair in place).
+2. G1 — shell boots from a real checkout (`chrome.exe`, tab 1 Chromium / tab 2 Gecko) — gated on disk/CI decision above.
+3. G2 — native cutover: IDL/CPP behind `engine` flag or deleted, `gn` build green without Gecko.
+4. G3 — patches rewritten to Views/`BUILD.gn` targets (not just mapping table).
+5. G4 — `zen.globals.mjs` Gecko allowlist stripped.
+6. Re-verify: app-only greps stay 0 + R1/R2 path checks pass + shell boots + flag `chromium` actually wired → then 100%.
+
+Commits stay direct to `chromium-migration` as `chore(migration): lane{N}: <file> <before>→0`. No merges, no heavy commands on low disk.

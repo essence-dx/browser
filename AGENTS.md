@@ -1,7 +1,7 @@
 # AGENTS — Chromium Migration (3 Lanes, 100% Complete, Hours — Main Task Only)
 
 **Branch:** `chromium-migration` from `dev@8df45e5` (Firefox 155.0.1)
-**Goal:** 100% complete Firefox Gecko → Chromium. 3 agents, 3 parallel lanes, same branch, no tests, no merges. Lanes finish = browser boots on Chromium. Current status ~10% — 1820 Gecko API hits + 2056 protocol/CSS hits left in `src/zen` (~250 files), 258 patches untouched, XPCOM C++ untouched, `engine-chromium/` empty.
+**Goal:** 100% complete Firefox Gecko → Chromium. 3 agents, 3 parallel lanes, same branch, no tests, no merges. Lanes finish = browser boots on Chromium. Current status (verified 2026-09-24, HEAD `01eb20c` — AGENTS task list below unchanged): app-only grep is 0 BUT the tree does not run — see TODO.md (R1–R4 repairs + G1–G4) and `docs/chromium-migration-audit.md` §7. `engine-chromium/` is a 31-file scaffold (not booted); 125 patches mapped-not-rewritten; ~20 IDL/CPP files kept with mojo shims alongside; `surfer.json` flag reads `"chromium"` but is unwired.
 **Scope:** `src/zen` app 176 files / ~50k lines + 258 patches / 13k lines + 15 XPCOM/C++ files + `engine-chromium/` shell. 808 test files ignored.
 **Done = 100%:** zero `Services\.|gBrowser\.|SessionStore\.|PlacesUtils\.|MozXULElement|createXULElement|ChromeUtils\.|XPCOMUtils\.` outside `src/zen/adapters/`, zero `chrome://|resource://|-moz-|@namespace|%include` in migrated files, `engine-chromium/` boots one window (tab 1 = Chromium, tab 2 = Gecko fallback), flag flips to `"chromium"`. Not "imports added" — every call site actually swapped and working.
 

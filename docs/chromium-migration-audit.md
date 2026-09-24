@@ -173,3 +173,34 @@ consumed as-is. This is the only path on which `migration.engine: "chromium"` me
 
 **A**, then **B** as a separate, honestly-scoped effort. Do not build the current tree as-is: it
 will burn hours and fail, because §3a and §3b are in files the Gecko build consumes.
+
+---
+
+## 7. Update 2026-09-24 (HEAD `01eb20c` — audit re-verified, findings stand)
+
+Re-ran the §3 checks against the current tree. Every finding above still holds; one is partially
+addressed:
+
+- **§1 (no Chromium):** holds. `engine-chromium/` is now 31 files / ~106 KB (was 23 / 138 KB) —
+  still no engine, no binaries, no checkout. **Partially addressed:** `f26a6a9` replaced the mock
+  GN described here with a real `//zen` static library (`zen_layer.cc`, `zen_tab_model.cc`,
+  `zen_vertical_tab_strip.cc` + headers), so the "not buildable GN" bullets no longer apply to the
+  current `BUILD.gn`. It remains uncompiled without a checkout, and the extension-manifest /
+  `<webview>` / cross-root-CSS points stand for the shell files.
+- **§2 (Gecko unbuilt):** holds. No `dist/bin`, CLOBBER+config.log only, mingw64-vs-MSVC shell
+  pitfall, unbootstrapped `~/.mozbuild`.
+- **§3a (49 dead paths):** holds. `Test-Path src/zen/assets` → False, `src/zen/styles` → False;
+  sample refs re-confirmed (`ZenSpaceManager.mjs:2615`, `ZenWelcome.mjs:67,366,605`,
+  `zen-space-routing.inc.xhtml:23,33,38,44`). Tracked as TODO.md R1.
+- **§3b (broken import):** holds with a nuance. `ZenUIManager.mjs:9` keeps the
+  `UrlbarShared` import **commented out** while `:504` calls
+  `UrlbarShared.RESULT_SOURCE.ZEN_ACTIONS` live. Tracked as TODO.md R2.
+- **§3c–d (decorative flag):** holds. `engine.mjs` contains no `surfer` read (sniffs live
+  globals); `ZEN_MIGRATION_ENGINE` resolves only to the `src/zen/moz.build` comment. Tracked
+  as TODO.md R3.
+- **Disk:** lane-plan measured G: 29 GB free at audit time; today **55.60 GB free** (nothing
+  deleted by this effort — do not treat as headroom). Still short of the 78 GB minimum
+  (~22 GB) and the 100 GB+ official requirement (~44 GB).
+- **Recommendation:** unchanged — **A then B**, or C. The repair list is now tracked as
+  TODO.md R1–R4 with a three-gate verification (grep + path-existence + import-live) so a
+  green grep can never again pass for a broken tree.
