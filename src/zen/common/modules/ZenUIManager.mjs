@@ -174,6 +174,20 @@ window.gZenUIManager = {
     });
   },
 
+  /**
+   * Shakes an element from side to side to catch the user's eye.
+   *
+   * @param {Element} element
+   * @param {number} delay Milliseconds to wait before shaking.
+   */
+  shakeElement(element, delay = 0) {
+    return this.elementAnimate(
+      element,
+      { x: [0, -12, 8, -4, 2, 0] },
+      { duration: 600, delay, easing: "ease-out" }
+    );
+  },
+
   _addNewCustomizableButtonsIfNeeded() {
     const kPref = "zen.ui.migration.compact-mode-button-added";
     let navbarPlacements = CustomizableUI.getWidgetIdsInArea(
@@ -279,7 +293,7 @@ window.gZenUIManager = {
     };
   },
 
-  updateTabsToolbar() {
+  updateTabsToolbar(fromResizeEvent = false) {
     const kUrlbarHeight = 333;
     gURLBar.style.setProperty(
       "--zen-urlbar-top",
@@ -292,8 +306,8 @@ window.gZenUIManager = {
     gZenVerticalTabsManager.actualWindowButtons.removeAttribute(
       "zen-has-hover"
     );
-    gZenVerticalTabsManager.recalculateURLBarHeight(true);
-    if (!this._preventToolbarRebuild) {
+    gZenVerticalTabsManager.recalculateURLBarHeight(!fromResizeEvent);
+    if (!this._preventToolbarRebuild && !fromResizeEvent) {
       setTimeout(() => {
         gZenWorkspaces.updateTabsContainers();
       }, 0);
@@ -1032,6 +1046,7 @@ window.gZenVerticalTabsManager = {
       enumerable: true,
       get: () => {
         return (
+          document.documentElement.hasAttribute("popup-window") ||
           document.documentElement
             .getAttribute("chromehidden")
             ?.includes("toolbar") ||
@@ -1309,8 +1324,16 @@ window.gZenVerticalTabsManager = {
     if (gZenWorkspaces._processingResize) {
       return;
     }
+    this._pendingUrlbarFormatUpdate ||= updateFormat;
+    if (this._urlbarHeightRecalcScheduled) {
+      return;
+    }
+    this._urlbarHeightRecalcScheduled = true;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
+        delete this._urlbarHeightRecalcScheduled;
+        const shouldUpdateFormat = this._pendingUrlbarFormatUpdate;
+        delete this._pendingUrlbarFormatUpdate;
         gURLBar.removeAttribute("--urlbar-height");
         let height;
         if (!this._hasSetSingleToolbar) {
@@ -1321,7 +1344,7 @@ window.gZenVerticalTabsManager = {
         if (typeof height !== "undefined") {
           gURLBar.style.setProperty("--urlbar-height", `${height}px`);
         }
-        if (updateFormat) {
+        if (shouldUpdateFormat) {
           gURLBar.zenFormatURLValue();
         }
       });
@@ -1434,17 +1457,36 @@ window.gZenVerticalTabsManager = {
 
       if (isSingleToolbar) {
         this._navbarParent = navBar.parentElement;
-        let elements = document.querySelectorAll(
-          '#nav-bar-customization-target > :is([cui-areatype="toolbar"], .chromeclass-toolbar-additional):not(#urlbar-container):not(toolbarspring)'
+        let elements = Array.from(
+          document.querySelectorAll(
+            '#nav-bar-customization-target > :is([cui-areatype="toolbar"], .chromeclass-toolbar-additional):not(#urlbar-container):not(toolbarspring)'
+          )
         );
-        elements = Array.from(elements).reverse();
+        let normalButtons = [];
+        let extensionButtons = [];
+        for (const element of elements) {
+          if (
+            element.hasAttribute("data-extensionid") &&
+            getBoolPrefSync("zen.view.overflow-webext-toolbar", true)
+          ) {
+            extensionButtons.push(element);
+          } else {
+            normalButtons.push(element);
+          }
+        }
         // Add separator if it doesn't exist
         if (!this._hasSetSingleToolbar) {
           buttonsTarget.append(this._topButtonsSeparatorElement);
         }
         this._hasSetSingleToolbar = true;
-        for (const button of elements) {
+        for (const button of normalButtons.reverse()) {
           this.appendCustomizableItem(this._topButtonsSeparatorElement, button);
+        }
+        for (const extension of extensionButtons) {
+          this.appendCustomizableItem(
+            this._topButtonsSeparatorElement,
+            extension
+          );
         }
         buttonsTarget.prepend(
           document.getElementById("unified-extensions-button")
@@ -1606,13 +1648,7 @@ window.gZenVerticalTabsManager = {
   },
 
   rebuildURLBarMenus() {
-    if (document.getElementById("paste-and-go")) {
-      return;
-    }
-    gURLBar._initCopyCutController();
-    gURLBar._initPasteAndGo();
-    gURLBar._initStripOnShare();
-    gURLBar._updatePlaceholderFromDefaultEngine();
+    gURLBar.updatePlaceholder();
   },
 
   rebuildAreas() {

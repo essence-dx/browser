@@ -9,9 +9,10 @@
  */
 
 let _html = null;
+let _litModule = null;
 try {
-  const lit = await import("lit").catch(() => null);
-  _html = lit?.html ?? null;
+  _litModule = await import("lit").catch(() => null);
+  _html = _litModule?.html ?? null;
 } catch {
   _html = null;
 }
@@ -57,3 +58,37 @@ export class ZenLitElement extends HTMLElement {
 }
 
 export const MozLitElement = ZenLitElement;
+
+// Directives used by the Zen Library components. Gecko resolves these from
+// vendor lit.all.mjs; Chromium resolves them from npm lit. Fallbacks below
+// only run when neither is present (same policy as html() above).
+export const nothing = _litModule?.nothing ?? Symbol("lit-nothing");
+
+export function repeat(items, keyFn, templateFn) {
+  if (_litModule?.repeat) {
+    return _litModule.repeat(items, keyFn, templateFn);
+  }
+  const fn = templateFn ?? keyFn;
+  return Array.from(items ?? [], (item, index) => fn(item, index));
+}
+
+export function when(cond, trueCase, falseCase) {
+  if (_litModule?.when) {
+    return _litModule.when(cond, trueCase, falseCase);
+  }
+  const branch = cond ? trueCase : falseCase;
+  return typeof branch === "function" ? branch() : branch ?? nothing;
+}
+
+export function styleMap(styleInfo) {
+  if (_litModule?.styleMap) {
+    return _litModule.styleMap(styleInfo);
+  }
+  return Object.entries(styleInfo ?? {})
+    .filter(([, value]) => value !== undefined && value !== null)
+    .map(([name, value]) => {
+      const cssName = name.replace(/[A-Z]/g, m => `-${m.toLowerCase()}`);
+      return `${cssName}:${value}`;
+    })
+    .join(";");
+}

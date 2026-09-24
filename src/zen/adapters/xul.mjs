@@ -40,6 +40,22 @@ export function makeXulElement(type) {
   return createXULElementLocal(type);
 }
 
+// Document-scoped creation for foreign documents (library preview/menu
+// documents). Nodes adopt automatically when appended elsewhere.
+export function makeXulElementIn(doc, type) {
+  try {
+    const factory = doc?.createXULElement;
+    if (typeof factory === "function") {
+      return factory.call(doc, type);
+    }
+  } catch {}
+  try {
+    return (doc ?? document).createElement(type);
+  } catch {
+    return document.createElement(type);
+  }
+}
+
 export function makeXulFragment(aString) {
   return parseXULFragment(aString);
 }

@@ -45,7 +45,6 @@ let JSWINDOWACTORS = {
     child: {
       esModuleURI: "../../glance/actors/ZenGlanceChild.sys.mjs",
       events: {
-        DOMContentLoaded: {},
         mousedown: {
           capture: true,
         },
@@ -89,9 +88,7 @@ if (!getAppInfo().inSafeMode) {
     child: {
       esModuleURI: "../../boosts/actors/ZenBoostsChild.sys.mjs",
       events: {
-        // Needed to let the actor be created, please don't remove
-        // without checking if boosts still work without it, thanks <3
-        DOMWindowCreated: {},
+        DOMDocElementInserted: {},
       },
     },
     safeForUntrustedWebProcess: true,

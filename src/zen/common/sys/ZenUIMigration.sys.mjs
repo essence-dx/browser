@@ -11,6 +11,7 @@ import {
   setIntPref,
   setStringPref,
   prefHasUserValue,
+  clearUserPref,
   confirmDialog,
 } from "../../adapters/prefs.mjs";
 import { getAllWindowsRestoredPromise } from "../../adapters/session.mjs";
@@ -25,10 +26,24 @@ import {
 
 // Session state (was a lazy system-module getter) now resolves through
 // adapters/session.mjs.
+const lazy = {
+  CustomizableUI: null,
+};
+
+// Toolbar customization lives in the Gecko tree only; resolve it when
+// present so the library-button migration below no-ops on Chromium.
+try {
+  const customUI = await import(
+    "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs"
+  ).catch(() => null);
+  lazy.CustomizableUI = customUI?.CustomizableUI ?? null;
+} catch {
+  lazy.CustomizableUI = null;
+}
 
 class nsZenUIMigration {
   PREF_NAME = "zen.ui.migration.version";
-  MIGRATION_VERSION = 7;
+  MIGRATION_VERSION = 8;
 
   async init(isNewProfile) {
     if (!isNewProfile) {
@@ -38,6 +53,7 @@ class nsZenUIMigration {
         console.error("ZenUIMigration: Error during migration", e);
       }
     }
+    this.#migrateLibraryButton();
     this.clearVariables();
     if (this.shouldRestart) {
       // A restart applies pending migration prefs; on Chromium the runtime
@@ -66,6 +82,42 @@ class nsZenUIMigration {
 
   clearVariables() {
     this._migrationVersion = this.MIGRATION_VERSION;
+  }
+
+  #migrateLibraryButton() {
+    const donePref = "zen.library.migrated-downloads-button";
+    if (
+      !getBoolPrefSync("zen.library.enabled", false) ||
+      getBoolPrefSync(donePref, false) ||
+      !lazy.CustomizableUI
+    ) {
+      return;
+    }
+    // A toolbar's saved placements are only there once a window has it.
+    const footButtons = "zen-sidebar-foot-buttons";
+    const listener = {
+      onAreaNodeRegistered: area => {
+        if (area !== footButtons) {
+          return;
+        }
+        lazy.CustomizableUI.removeListener(listener);
+        setBoolPref(donePref, true);
+        const downloads =
+          lazy.CustomizableUI.getPlacementOfWidget("downloads-button");
+        if (
+          downloads?.area === footButtons &&
+          !lazy.CustomizableUI.getPlacementOfWidget("zen-library-button")
+        ) {
+          lazy.CustomizableUI.addWidgetToArea(
+            "zen-library-button",
+            footButtons,
+            downloads.position
+          );
+          lazy.CustomizableUI.removeWidgetFromArea("downloads-button");
+        }
+      },
+    };
+    lazy.CustomizableUI.addListener(listener);
   }
 
   async _migrateV1() {
@@ -176,6 +228,18 @@ class nsZenUIMigration {
       )
     ) {
       setBoolPref("zen.widget.macos.window-vibrancy", false);
+    }
+  }
+
+  _migrateV8() {
+    // A version mismatch in the downloadable gfx blocklist wrongly blocked
+    // video overlays for every Windows user. The status pref persists in the
+    // profile and short-circuits the blocklist evaluation, so clear it (and
+    // its failure id) and restart, since gfx is already initialized by now.
+    if (prefHasUserValue("gfx.blacklist.video-overlay")) {
+      clearUserPref("gfx.blacklist.video-overlay");
+      clearUserPref("gfx.blacklist.video-overlay.failureid");
+      this.shouldRestart = true;
     }
   }
 }

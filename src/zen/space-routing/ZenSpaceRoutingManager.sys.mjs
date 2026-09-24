@@ -154,6 +154,14 @@ class nsZenSpaceRoutingManager {
     this.#routeToWorkspace(targetRoute, newTab, options.inBackground, win);
   }
 
+  shouldDeferTabSelection(beforeResult, win) {
+    return (
+      beforeResult.isRouteFound &&
+      beforeResult.targetRoute !== win.gZenWorkspaces.activeWorkspace &&
+      this.#isMostRecentBrowserWindow(win)
+    );
+  }
+
   /**
    * Decides whether an in-place top-level navigation should be pulled out of
    * the current tab and re-opened in a new tab, so that addTab()'s routing can
@@ -273,6 +281,16 @@ class nsZenSpaceRoutingManager {
       }
     } catch (err) {
       console.error("[ZenSpaceRouting]: Error moving tab to workspace:", err);
+    }
+  }
+
+  #isMostRecentBrowserWindow(win) {
+    // Chromium: no sync window-order API; the focused window stands in for
+    // the most-recent one (upstream reads the window mediator here).
+    try {
+      return !!win?.document?.hasFocus?.();
+    } catch {
+      return true;
     }
   }
 

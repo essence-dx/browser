@@ -100,3 +100,18 @@ export function compareURLHost(a, b) {
     return false;
   }
 }
+
+// Closed-tab count for the reopen-closed-tab palette action. Sync because
+// availability callbacks are sync: Gecko reads the live count; Chromium has
+// async-only chrome.sessions, so availability there resolves in the shell
+// palette (engine-chromium/shell) and this reports none.
+export function getClosedTabCountSync(win) {
+  if (_chromiumSession()) {
+    return 0;
+  }
+  try {
+    return SessionStore.getClosedTabCount(win) ?? 0;
+  } catch {
+    return 0;
+  }
+}

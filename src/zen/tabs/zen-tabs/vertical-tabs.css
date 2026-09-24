@@ -85,7 +85,8 @@
   height: 100%;
 }
 
-#browser {
+#browser,
+zen-library {
   --zen-min-toolbox-padding: 5px;
   @media all {
     /* was (legacy-platform: macos) — gate via [data-platform="macos"]. */
@@ -233,7 +234,8 @@
 /* ==========================================================================
    Navigator Toolbox (Main Sidebar Container) Base Styles
    ========================================================================== */
-#navigator-toolbox {
+#navigator-toolbox,
+.zen-library-space-body {
   /* Define theme variables, including platform specifics for native look */
   --zen-toolbox-min-width: 1px;
   --border-radius-medium: 14px;
@@ -333,6 +335,10 @@
 
     &[zen-empty-tab] {
       display: none;
+    }
+
+    &[drag-image] .tab-background {
+      border-radius: calc(var(--border-radius-medium) / var(--zen-squircle-value)) !important;
     }
 
     /* stylelint-disable-next-line stylelint-plugin-mozilla/no-has-selector */
@@ -456,13 +462,21 @@
   }
 }
 
+/* macOS footer sizing (was @media legacy-platform: macos) — re-apply under
+   :root[data-platform="macos"] once the shell sets it. */
+
 #zen-sidebar-foot-buttons {
+  position: relative;
   background: transparent;
   gap: 5px;
   align-items: center;
 
   & > toolbarbutton:not(#zen-workspaces-button) {
     padding: 0 !important;
+  }
+
+  :root[zen-right-side="true"][zen-sidebar-expanded="true"] & {
+    flex-direction: row-reverse;
   }
 }
 
@@ -512,7 +526,7 @@
   }
 }
 
-#navigator-toolbox[zen-sidebar-expanded="true"] {
+:is(#navigator-toolbox, .zen-library-space-body)[zen-sidebar-expanded="true"] {
   --zen-toolbox-min-width: fit-content;
 
   padding: var(--zen-toolbox-padding);
@@ -568,7 +582,6 @@
 
   & #zen-sidebar-foot-buttons {
     display: flex;
-    flex-direction: row;
     justify-content: space-between;
     width: 100%;
     position: relative;
@@ -633,6 +646,8 @@
     --tab-icon-end-margin: 8.5px;
 
     & .tabbrowser-tab {
+      overflow: visible;
+
       & .tab-label-container {
         opacity: 1;
         display: flex;
@@ -877,6 +892,10 @@
 
 :root:not([zen-sidebar-expanded="true"]) #zen-sidebar-splitter {
   display: none !important;
+}
+
+#zen-sidebar-splitter[zen-library-open="true"] {
+  pointer-events: none !important;
 }
 
 #zen-sidebar-splitter {
@@ -1281,10 +1300,6 @@
     left: calc(var(--indicator-left) + 2 * var(--zen-drag-indicator-height) + 4px);
     width: calc(var(--indicator-width) - 2 * var(--zen-drag-indicator-height) - 4px);
     height: var(--zen-drag-indicator-height);
-    transition:
-      top 0.05s ease-out,
-      left 0.05s ease-out,
-      width 0.05s ease-out;
 
     &::before {
       left: calc(-2 * var(--zen-drag-indicator-height));
@@ -1297,10 +1312,6 @@
     top: calc(var(--indicator-top) + 2 * var(--zen-drag-indicator-height) + 4px);
     height: calc(var(--indicator-height) - 2 * var(--zen-drag-indicator-height) - 4px);
     width: var(--zen-drag-indicator-height);
-    transition:
-      top 0.1s ease-out,
-      left 0.1s ease-out,
-      height 0.1s ease-out;
 
     &::before {
       top: calc(-2 * var(--zen-drag-indicator-height));
@@ -1354,7 +1365,7 @@
   }
 }
 
-#tabs-newtab-button:not([in-urlbar="true"]) label,
+#tabs-newtab-button:not([in-urlbar="true"]),
 .zen-current-workspace-indicator-name {
   color: color-mix(in srgb, currentColor 70%, transparent);
 }

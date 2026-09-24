@@ -243,6 +243,21 @@ export function invalidateCachedTabs() {
   return undefined;
 }
 
+// DOM tab-strip reorder with the browser's move semantics (TabMove events on
+// Gecko via the patched zenHandleTabMove; plain DOM move on Chromium).
+// Replaces direct win.gBrowser.zenHandleTabMove / win.gZenTabMoves calls.
+export function moveTabElement(el, moveFn) {
+  if (_chromiumTabs()) {
+    return moveFn();
+  }
+  try {
+    if (gBrowser?.zenHandleTabMove) {
+      return gBrowser.zenHandleTabMove(el, moveFn);
+    }
+  } catch {}
+  return moveFn();
+}
+
 export function invalidateCachedVisibleTabs() {
   if (_chromiumTabs()) {
     return undefined;

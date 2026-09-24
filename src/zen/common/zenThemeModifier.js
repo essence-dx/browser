@@ -124,7 +124,7 @@ import { getSelectedTabSync } from "../adapters/tabs.mjs";
         if (isMacOS) {
           const targetRadius =
             document.documentElement.getAttribute("data-platform") === "macos"
-              ? 12
+              ? 11
               : 10;
           document.documentElement.style.setProperty(
             "--zen-border-radius",

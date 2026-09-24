@@ -403,7 +403,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
         alwaysUnload &&
         ["close", "reset", "switch", "reset-switch"].includes(behavior)
       ) {
-        behavior = behavior.contains("reset")
+        behavior = behavior.includes("reset")
           ? "reset-unload-switch"
           : "unload-switch";
       }
@@ -420,6 +420,18 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
         case "reset-switch":
         case "switch":
           if (behavior.includes("unload")) {
+            if (pinnedTabs.some(tab => tab.selected)) {
+              const selectedTabs = pinnedTabs.filter(tab => tab.selected);
+              // Chromium: blur to the first visible unpinned tab (upstream
+              // uses the tabbrowser _findTabToBlurTo helper here).
+              const tabToBlurTo =
+                getTabsSync().find(
+                  tab => !tab.pinned && !tab.hidden && !selectedTabs.includes(tab)
+                ) ?? null;
+              if (tabToBlurTo) {
+                void setSelectedTab(tabToBlurTo);
+              }
+            }
             for (const tab of pinnedTabs) {
               if (tab.hasAttribute("glance-id")) {
                 // We have a glance tab inside the tab we are trying to unload,
@@ -518,7 +530,8 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
     }
 
     // Remove everything except the entry we want to keep.
-    // Null-principal stub: Chromium restores without serialized principals.
+    // Null-principal stub: Chromium restores without serialized principals
+    // (upstream serializes content/null principals via XPCOM here).
     state.entries = [
       {
         ...initialState.entry,
@@ -729,7 +742,7 @@ class nsZenPinnedTabManager extends nsZenDOMOperatedFeature {
             }
             void setIcon(tab, icon);
             lazy.TabStateCache.update(tab.permanentKey, {
-              image: null,
+              image: icon || null,
             });
           },
         });

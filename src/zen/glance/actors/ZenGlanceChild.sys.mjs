@@ -21,12 +21,18 @@ function hrefAndLinkNodeForClickEvent(event) {
   return [href, node, null];
 }
 
+defineLazyPref(
+  lazy,
+  "activationMethod",
+  "zen.glance.activation-method",
+  "ctrl"
+);
+
 // A small threshold to allow for minor mouse jitter during a normal click.
 // Anything beyond this is likely an intentional drag (like selecting text).
 const CLICK_DRAG_THRESHOLD_PX = 4;
 
 export class ZenGlanceChild extends JSWindowActorChild {
-  #activationMethod;
   #mouseDownX = null;
   #mouseDownY = null;
 
@@ -39,12 +45,6 @@ export class ZenGlanceChild extends JSWindowActorChild {
     if (typeof handler === "function") {
       await handler.call(this, event);
     }
-  }
-
-  async #initActivationMethod() {
-    this.#activationMethod = await this.sendQuery(
-      "ZenGlance:GetActivationMethod"
-    );
   }
 
   #ensureOnlyKeyModifiers(event) {
@@ -163,7 +163,7 @@ export class ZenGlanceChild extends JSWindowActorChild {
     ) {
       return;
     }
-    const activationMethod = this.#activationMethod;
+    const activationMethod = lazy.activationMethod;
     if (activationMethod === "ctrl" && !event.ctrlKey) {
       return;
     } else if (activationMethod === "alt" && !event.altKey) {
@@ -190,9 +190,5 @@ export class ZenGlanceChild extends JSWindowActorChild {
         this.contentWindow.document.activeElement !==
         this.contentWindow.document.body,
     });
-  }
-
-  async on_DOMContentLoaded() {
-    await this.#initActivationMethod();
   }
 }

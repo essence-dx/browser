@@ -6,6 +6,7 @@
 // Tab calls below go through the tabs adapter (see
 // src/zen/adapters/tabs.mjs); live-folders import is Lane 3's.
 import { ZenLiveFoldersManager } from "../live-folders/ZenLiveFoldersManager.sys.mjs";
+import { ZenLibrary } from "../library/ZenLibrary.mjs";
 import {
   getSelectedTabSync,
   getSelectedTabsSync,
@@ -52,6 +53,9 @@ document.addEventListener(
             break;
           case "cmd_zenSplitViewContextMenu":
             gZenViewSplitter.contextSplitTabs();
+            break;
+          case "cmd_zenCtxShareSplitView":
+            gZenViewSplitter.contextShareSplitView();
             break;
           case "cmd_zenCopyCurrentURLMarkdown":
             gZenCommonActions.copyCurrentURLAsMarkdownToClipboard();
@@ -101,6 +105,9 @@ document.addEventListener(
             break;
           case "cmd_zenCtxDeleteWorkspace":
             gZenWorkspaces.contextDeleteWorkspace(event);
+            break;
+          case "cmd_zenCtxShareWorkspace":
+            gZenWorkspaces.contextShareWorkspace();
             break;
           case "cmd_zenChangeWorkspaceName":
             gZenVerticalTabsManager.renameTabStart({
@@ -166,6 +173,10 @@ document.addEventListener(
             for (const tab of selectedTabs) {
               await duplicateTab(tab, true);
             }
+            break;
+          }
+          case "cmd_zenToggleLibrary": {
+            ZenLibrary.toggle();
             break;
           }
           default:

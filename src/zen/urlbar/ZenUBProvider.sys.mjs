@@ -4,6 +4,7 @@
 
 import { ProvidersManager } from "moz-src:///browser/components/urlbar/UrlbarProvidersManager.sys.mjs";
 import { ZenUrlbarProviderGlobalActions } from "./ZenUBActionsProvider.sys.mjs";
+import { ZenUrlbarProviderSidebar } from "./ZenUBSidebarProvider.sys.mjs";
 
 // Chromium migration (lane 3): urlbar provider registration.
 // Legacy provider manager maps to omnibox keyword registration
@@ -11,6 +12,7 @@ import { ZenUrlbarProviderGlobalActions } from "./ZenUBActionsProvider.sys.mjs";
 
 const zenUrlbarProviders = {
   ZenUrlbarProviderGlobalActions,
+  ZenUrlbarProviderSidebar,
 };
 
 export function registerZenUrlbarProviders() {

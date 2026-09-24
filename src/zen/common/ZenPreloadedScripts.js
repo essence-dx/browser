@@ -30,6 +30,7 @@ import { gZenSpaceRoutingManager as ZenSpaceRoutingManagerModule } from "../spac
     "./emojis/ZenEmojiPicker.mjs",
     "../live-folders/ZenLiveFoldersUI.mjs",
     "../downloads/ZenDownloadAnimation.mjs",
+    "../share/ZenShareManager.mjs",
   ];
 
   for (let script of scripts) {

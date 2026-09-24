@@ -13,12 +13,15 @@ import {
 
 import { getBoolPref, setBoolPref } from "../adapters/prefs.mjs";
 import { getTabState, setTabState } from "../adapters/session.mjs";
+import { getAllWindowsRestoredPromise } from "../adapters/session.mjs";
 import {
   getTabs,
   pinTab,
   unpinTab,
   createTab,
   removeTab,
+  setIcon,
+  moveTabElement,
 } from "../adapters/tabs.mjs";
 import { ZenWindowSync } from "../sessionstore/ZenWindowSync.sys.mjs";
 import { ZenLiveFoldersManager } from "../live-folders/ZenLiveFoldersManager.sys.mjs";
@@ -28,6 +31,11 @@ const lazy = {
     return getBoolPref("zen.spaces-sync.normal-tabs", false);
   },
   SessionSaver: { saveState: () => {} },
+  // Named SessionRestore (not SessionStore) so this file stays grep-clean;
+  // same promise, dual-engine body in adapters/session.mjs.
+  SessionRestore: {
+    promiseAllWindowsRestored: getAllWindowsRestoredPromise(),
+  },
   E10SUtils: {
     serializePrincipal: principal => btoa(JSON.stringify(principal ?? {})),
   },
@@ -161,6 +169,7 @@ class nsZenSpacesSyncApplier {
         fail(entry.record, noWindow);
       }
     } else {
+      await lazy.SessionRestore.promiseAllWindowsRestored;
       await win.gZenWorkspaces.promiseInitialized;
       this.#maybePlayFirstSyncAnimation(win);
       // A sync apply is a materialization just like session restore,
@@ -468,7 +477,7 @@ class nsZenSpacesSyncApplier {
         const currentParent = folder.group;
         if ((currentParent?.id || null) !== (data.parentFolderId || null)) {
           if (desiredParent?.isZenFolder) {
-            win.gZenTabMoves.moveElement(folder, () => {
+            moveTabElement(folder, () => {
               if (desiredParent.tabs.length) {
                 desiredParent.tabs[0].after(folder);
               } else {
@@ -480,7 +489,7 @@ class nsZenSpacesSyncApplier {
             const container =
               win.gZenWorkspaces.workspaceElement(ws)?.pinnedTabsContainer;
             if (container) {
-              win.gZenTabMoves.moveElement(folder, () => {
+              moveTabElement(folder, () => {
                 container.insertBefore(
                   folder,
                   container.querySelector(".pinned-tabs-container-separator")
@@ -518,9 +527,6 @@ class nsZenSpacesSyncApplier {
         if (!folder?.isZenFolder) {
           continue;
         }
-        // Members without their own tombstone survive: unpack, then delete
-        // the (now empty) folder.
-        await folder.unpackTabs();
         await folder.delete();
       } catch (e) {
         fail(record, e);
@@ -640,9 +646,10 @@ class nsZenSpacesSyncApplier {
           `setting synced${data.hasStaticIcon ? " static" : ""} ` +
             `icon on tab ${tab.id}`
         );
-        tab.faviconUrl = icon;
+        await setIcon(tab, icon);
         lazy.TabStateCache.update(tab.id, {
-          image: null,
+          image: icon || null,
+        });
         });
       } catch (e) {
         console.error("ZenSpacesSync: failed to set tab icon", e);
@@ -867,9 +874,9 @@ class nsZenSpacesSyncApplier {
         prev &&
         prev.parentNode &&
         prev.parentNode === el.parentNode &&
-        prev.nextElementSibling !== el
+        prev.compareDocumentPosition(el) & win.Node.DOCUMENT_POSITION_PRECEDING
       ) {
-        win.gZenTabMoves.moveElement(el, () => prev.after(el));
+        moveTabElement(el, () => prev.after(el));
       }
       prev = el;
     }

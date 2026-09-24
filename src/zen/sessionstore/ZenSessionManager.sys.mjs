@@ -807,6 +807,9 @@ export class nsZenSessionManager {
       return;
     }
     this.log("Restoring new window with Zen session data");
+    // Prime the session cache before reading _windows (upstream primes via
+    // the session store module; here it goes through the injected module).
+    void SessionStoreInternal.getCurrentState?.(true);
     // We want to iterate all windows except from aWindow.__SSi (string).
     // SessionStoreInternal._windows is an object, with the ID as key and the
     // window data as value, so we need to filter out the values that have the
@@ -920,7 +923,7 @@ export class nsZenSessionManager {
         continue;
       }
       lazy.TabStateFlusher.flush(tab.linkedBrowser)
-        .then(() => {
+        .then(async () => {
           // Things may have changed while the flush was in flight.
           if (
             aWindow.closed ||
@@ -931,7 +934,7 @@ export class nsZenSessionManager {
             return;
           }
           // Chromium: setTabState/getTabState via adapters/session.mjs.
-          setTabState(targetTab, getTabState(tab));
+          setTabState(targetTab, await getTabState(tab));
         })
         .catch(e =>
           console.error("ZenSessionManager: Failed to refresh tab state", e)
@@ -951,6 +954,9 @@ export class nsZenSessionManager {
     aWindow.gZenWorkspaces.restoreWorkspacesFromSessionStore({
       spaces: this.#sidebarWithoutCloning.spaces || [],
     });
+    // There is no restore coming for this window, so nothing else is going to
+    // tell the spaces their tabs are in place.
+    aWindow.gZenWorkspaces.onWindowRestored();
   }
 
   /**

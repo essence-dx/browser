@@ -101,7 +101,7 @@
   ) !important;
   --focus-outline-color: var(--color-accent-primary) !important;
 
-  --toolbarbutton-icon-fill-attention: var(--toolbar-color) !important;
+  --toolbarbutton-icon-fill-attention: var(--toolbar-color, currentColor) !important;
   --toolbarbutton-icon-fill: currentColor !important;
 
   --button-background-color-primary: var(--in-content-primary-button-background) !important;
@@ -284,7 +284,7 @@
   /* was @media (legacy-platform: windows) Segoe UI stack — gate via [data-platform="windows"]. */
 }
 
-#main-window[windowtype="navigator:browser"]:not([chromehidden~='toolbar']) {
+#main-window[windowtype="navigator:browser"]:not([popup-window]) {
   min-height: 495px !important;
 
   /* was @media (legacy-windows-mica) or (legacy-platform: macos) or ((legacy-platform: linux) and legacy-pref('zen.widget.linux.transparency')).

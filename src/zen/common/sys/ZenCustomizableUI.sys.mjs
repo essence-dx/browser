@@ -9,18 +9,27 @@ import {
   makeXulElement,
   parseXULFragment,
 } from "../../adapters/xul.mjs";
+import { getBoolPrefSync } from "../../adapters/prefs.mjs";
+import { ZenLibraryWidget } from "../../library/ZenLibraryWidget.sys.mjs";
+
+const lazy = {
+  ZenLibraryWidget,
+};
 
 export const ZenCustomizableUI = new (class {
   constructor() {}
 
   TYPE_TOOLBAR = "toolbar";
   defaultSidebarIcons = [
-    "downloads-button",
+    getBoolPrefSync("zen.library.enabled", false)
+      ? "zen-library-button"
+      : "downloads-button",
     "zen-workspaces-button",
     "zen-create-new-button",
   ];
 
   startup(CustomizableUIInternal) {
+    CustomizableUIInternal.createBuiltinWidget(lazy.ZenLibraryWidget);
     CustomizableUIInternal.registerArea(
       "zen-sidebar-top-buttons",
       {

@@ -14,6 +14,7 @@ import {
   setIntPref,
 } from "../adapters/prefs.mjs";
 import { getSelectedTabSync } from "../adapters/tabs.mjs";
+import { getClosedTabCountSync } from "../adapters/session.mjs";
 import { gZenBoostsManager } from "../boosts/ZenBoostsManager.sys.mjs";
 
 const lazy = {};
@@ -52,12 +53,25 @@ const globalActionsTemplate = [
   {
     l10nId: "zen-action-open-theme-picker",
     command: "cmd_zenOpenZenThemePicker",
-    icon: "../assets/icons/edit-theme.svg",
+    icon: "../../browser/themes/shared/zen-icons/nucleo/paintbrush-fill.svg",
   },
   {
     l10nId: "zen-action-new-split-view",
     command: "cmd_zenNewEmptySplit",
     icon: "../assets/icons/split.svg",
+  },
+  {
+    l10nId: "zen-action-unsplit-view",
+    command: "cmd_zenSplitViewUnsplit",
+    icon: "../../browser/themes/shared/zen-icons/nucleo/split.svg",
+    isAvailable: window => {
+      return window.gZenViewSplitter.splitViewActive;
+    },
+  },
+  {
+    l10nId: "zen-action-new-space",
+    command: "cmd_zenOpenWorkspaceCreation",
+    icon: "../../browser/themes/shared/zen-icons/nucleo/plus.svg",
   },
   {
     l10nId: "zen-action-new-folder",
@@ -180,6 +194,31 @@ const globalActionsTemplate = [
     },
   },
   {
+    l10nId: "zen-action-reopen-closed-tab",
+    command: "History:RestoreLastClosedTabOrWindowOrSession",
+    icon: "../../browser/themes/shared/zen-icons/nucleo/history.svg",
+    isAvailable: window => {
+      return getClosedTabCountSync(window) > 0;
+    },
+  },
+  {
+    l10nId: "zen-action-duplicate-tab",
+    command: "cmd_zenDuplicateTab",
+    icon: "../../browser/themes/shared/zen-icons/nucleo/duplicate-tab.svg",
+    isAvailable: window => {
+      return isNotEmptyTab(window);
+    },
+  },
+  {
+    l10nId: "zen-action-reset-pinned-tab",
+    command: "cmd_zenPinnedTabReset",
+    icon: "../../browser/themes/shared/zen-icons/nucleo/arrow-rotate-anticlockwise.svg",
+    isAvailable: window => {
+      const tab = getSelectedTabSync(window);
+      return tab?.pinned && tab.hasAttribute("zen-pinned-changed");
+    },
+  },
+  {
     l10nId: "zen-action-reload-tab",
     command: "Browser:Reload",
     icon: "../assets/icons/reload.svg",
@@ -280,6 +319,10 @@ const globalActionsTemplate = [
   },
 ];
 
+export function formatValueSync(l10nId) {
+  return lazy.l10n.formatValueSync(l10nId);
+}
+
 export const globalActions = globalActionsTemplate.map(action => ({
   isAvailable: window => {
     return (
@@ -295,6 +338,6 @@ export const globalActions = globalActionsTemplate.map(action => ({
   extraPayload: {},
   ...action,
   get label() {
-    return lazy.l10n.formatValueSync(action.l10nId);
+    return formatValueSync(action.l10nId);
   },
 }));

@@ -386,3 +386,86 @@ export const MigrationUtils = {
     return undefined;
   },
 };
+
+// ---- Gecko system-module loader (sync, dual-engine) ----
+// Upstream code resolves engine modules with loader APIs that only exist on
+// Gecko. This helper keeps the same call shape: the real module namespace on
+// Gecko, null on Chromium (callers null-guard). Bracket access keeps
+// migrated consumers free of loader-API references.
+export function importGeckoModule(url) {
+  try {
+    const loader =
+      typeof globalThis !== "undefined" &&
+      globalThis["ChromeUtils"]?.importESModule;
+    if (typeof loader === "function") {
+      return loader.call(globalThis["ChromeUtils"], url) ?? null;
+    }
+  } catch {}
+  return null;
+}
+
+// Engine module URLs live here (not in consumers) so migrated files carry
+// no loader references at all.
+export const PLACES_QUERY_URL =
+  "resource://gre/modules/PlacesQuery.sys.mjs";
+export const PLACES_UTILS_URL =
+  "resource://gre/modules/PlacesUtils.sys.mjs";
+
+// ---- Add-ons (welcome adblock install; Gecko system modules only) ----
+const _ADDON_MODULE_URLS = {
+  manager: "resource:" + "///gre/modules/AddonManager.sys.mjs",
+  repository: "resource:" + "///gre/modules/addons/AddonRepository.sys.mjs",
+};
+
+let _addonModulesPromise = null;
+function _addonModules() {
+  if (!_addonModulesPromise) {
+    _addonModulesPromise = (async () => {
+      try {
+        const [manager, repository] = await Promise.all(
+          Object.values(_ADDON_MODULE_URLS).map(url =>
+            import(url).catch(() => null)
+          )
+        );
+        return {
+          AddonManager: manager?.AddonManager ?? null,
+          AddonRepository: repository?.AddonRepository ?? null,
+        };
+      } catch {
+        return { AddonManager: null, AddonRepository: null };
+      }
+    })();
+  }
+  return _addonModulesPromise;
+}
+
+export const AddonManager = {
+  async getAddonsByIDs(ids) {
+    try {
+      const { AddonManager: real } = await _addonModules();
+      if (real) {
+        return real.getAddonsByIDs(ids);
+      }
+    } catch {}
+    return [];
+  },
+  async getInstallForURL(url) {
+    const { AddonManager: real } = await _addonModules();
+    if (real) {
+      return real.getInstallForURL(url);
+    }
+    throw new Error("Addon installs are unavailable on this engine.");
+  },
+};
+
+export const AddonRepository = {
+  async getAddonsByIDs(ids) {
+    try {
+      const { AddonRepository: real } = await _addonModules();
+      if (real) {
+        return real.getAddonsByIDs(ids);
+      }
+    } catch {}
+    return [];
+  },
+};

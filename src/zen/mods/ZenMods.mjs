@@ -17,8 +17,11 @@ import {
   clearUserPref,
   getAppInfo,
   getBoolPref,
+  getBoolPrefSync,
   getIntPref,
   getStringPref,
+  getStringPrefSync,
+  removePrefObserver,
   setBoolPref,
   setIntPref,
   setStringPref,
@@ -207,15 +210,21 @@ class nsZenMods extends nsZenPreloadedFeature {
       ({ enabled, preferences, name }) => ({
         enabled,
         sanitizedName: this.sanitizeModName(name),
-        prefs: preferences.map(({ property, type }) => ({
-          property,
-          type,
-          sanitizedProperty: property?.replaceAll(DOT_RE, "-"),
-          value:
-            enabled === undefined || enabled
-              ? getStringPref(property, "")
-              : "",
-        })),
+        prefs: preferences.map(({ property, type }) => {
+          const isEnabled = enabled === undefined || enabled;
+          const fallback = type === "checkbox" ? false : "";
+          return {
+            property,
+            type,
+            sanitizedProperty: property?.replaceAll(DOT_RE, "-"),
+            // Chromium: sync adapter reads (async reads can't run in map).
+            value: isEnabled
+              ? type === "checkbox"
+                ? getBoolPrefSync(property, false)
+                : getStringPrefSync(property, "")
+              : fallback,
+          };
+        }),
       })
     );
 
@@ -551,9 +560,19 @@ class nsZenMods extends nsZenPreloadedFeature {
     }
 
     // Chromium: storage onChanged replaces the legacy pref observer.
-    addPrefObserver(this.updatePref, this.#rebuildModsStylesheet.bind(this));
+    const rebuildObserver = this.#rebuildModsStylesheet.bind(this);
+    const disableObserver = this.#handleDisableMods.bind(this);
+    addPrefObserver(this.updatePref, rebuildObserver);
     // Chromium: storage onChanged replaces the legacy pref observer.
-    addPrefObserver("zen.themes.disable-all", this.#handleDisableMods.bind(this));
+    addPrefObserver("zen.themes.disable-all", disableObserver);
+    window.addEventListener(
+      "unload",
+      () => {
+        removePrefObserver(this.updatePref, rebuildObserver);
+        removePrefObserver("zen.themes.disable-all", disableObserver);
+      },
+      { once: true }
+    );
   }
 
   #setNewMilestoneIfNeeded() {

@@ -609,9 +609,12 @@ class nsZenBoostsManager {
    * @param {Window} parentWindow - The parent browser window
    * @param {Boost} boost - The boost which will be edited
    * @param {nsIURI} domainUri - The boost which will be edited
+   * @param {object} [options]
+   * @param {Element} [options.browser] - Browser showing the site when it is
+   *   not the selected tab, e.g. a detached glance
    * @returns {Window|null} The instanced editor window
    */
-  openBoostWindow(parentWindow, boost, domainUri) {
+  openBoostWindow(parentWindow, boost, domainUri, { browser = null } = {}) {
     if (!this.canBoostSite(domainUri)) {
       console.error(
         "[ZenBoostsManager] Cannot open editor for boost with invalid domain."
@@ -655,6 +658,27 @@ class nsZenBoostsManager {
       once: true,
     });
 
+    // Close the editor if the tab is switched or navigates. Upstream also
+    // wires a progress listener here (needs XPCOM); pagehide plus the
+    // TabSelect hook below cover it on both engines.
+    const onTabSelect = () => editor?.close?.();
+    const tabContainer =
+      parentWindow?.document?.getElementById("tabbrowser-tabs");
+    tabContainer?.addEventListener("TabSelect", onTabSelect, { once: true });
+    editor?.addEventListener?.(
+      "unload",
+      () => {
+        tabContainer?.removeEventListener("TabSelect", onTabSelect);
+        if (editor) {
+          editor.browser = null;
+        }
+      },
+      { once: true }
+    );
+
+    if (editor) {
+      editor.browser = browser;
+    }
     // Give the domain
     editor.domain = domain;
     editor.openerWindow = parentWindow;

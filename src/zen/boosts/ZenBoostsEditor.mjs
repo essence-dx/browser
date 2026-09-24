@@ -8,6 +8,7 @@ import {
   removeObserver,
   notifyObservers,
 } from "../adapters/observers.mjs";
+import { getSelectedTabSync } from "../adapters/tabs.mjs";
 
 export class nsZenBoostEditor {
   doc = null;
@@ -72,6 +73,20 @@ export class nsZenBoostEditor {
    * @returns {ZenBoostsParent} Boost JSActor parent
    */
   get zenBoostsParent() {
+    // Chromium: opener-window stub first would skip the actor path; try the
+    // JSActor (upstream mechanism) when the browser stack supports it.
+    try {
+      const linkedBrowser =
+        this.editorWindow?.browser ??
+        getSelectedTabSync()?.linkedBrowser;
+      const actor =
+        linkedBrowser?.browsingContext?.currentWindowGlobal?.getActor?.(
+          "ZenBoosts"
+        );
+      if (actor) {
+        return actor;
+      }
+    } catch {}
     return this.openerWindow?.zenBoosts ?? null;
   }
 
@@ -1499,7 +1514,7 @@ ${cssSelector} {
   shuffleBoost() {
     const availFonts = this.fetchFontList();
     const commonFonts = this.commonFonts;
-    let font = commonFonts[Math.round(Math.random() * commonFonts.length)];
+    let font = commonFonts[Math.floor(Math.random() * commonFonts.length)];
     if (availFonts.includes(font)) {
       this.currentBoostData.fontFamily = font;
     }

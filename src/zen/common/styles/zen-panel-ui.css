@@ -31,6 +31,15 @@ panel[type="arrow"]:not(#feature-callout) {
     }
   }
 
+  /* Squircle popups (upstream gates Linux / non-Mica Windows via platform
+     media query; no standard equivalent — applied here for all platforms,
+     re-gate via [data-platform] once the shell sets it). */
+  &::part(content) {
+    /* stylelint-disable-next-line property-no-unknown */
+    corner-shape: round;
+    border-radius: calc(var(--panel-border-radius) / var(--zen-squircle-value));
+  }
+
   /* was @media (legacy-platform: macos) — gate macOS via [data-platform="macos"]. */
   @media all {
     &:is([nonnative], :not([type="arrow"])) {

@@ -5,7 +5,7 @@
 import { parseXULFragment, insertFTLIfNeeded } from "../adapters/xul.mjs";
 import { getSelectedTabSync, addTab, setIcon } from "../adapters/tabs.mjs";
 import { recordHistoryVisit } from "../adapters/session.mjs";
-import { TabStateCache, SearchService as SearchServiceModule, MigrationUtils } from "../adapters/gre.mjs";
+import { TabStateCache, SearchService as SearchServiceModule, MigrationUtils, AddonManager, AddonRepository } from "../adapters/gre.mjs";
 // Gecko now (tab strip/Places utils/TabStateCache/MigrationUtils below);
 // Chromium: chrome.tabs/create, chrome.history, chrome.storage.session,
 // chrome.i18n — wire when surfer.json migration.engine === "chromium".
@@ -13,7 +13,21 @@ import { TabStateCache, SearchService as SearchServiceModule, MigrationUtils } f
 {
   const lazy = {
     SearchService: SearchServiceModule,
+    AddonManager,
+    AddonRepository,
+    CustomizableUI: null,
   };
+
+  // Toolbar customization lives in the Gecko tree only; resolve it when
+  // present so widget placement below no-ops on Chromium.
+  try {
+    const customUI = await import(
+      "moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs"
+    ).catch(() => null);
+    lazy.CustomizableUI = customUI?.CustomizableUI ?? null;
+  } catch {
+    lazy.CustomizableUI = null;
+  }
 
   const kZenElementsToIgnore = [
     "zen-browser-background",
@@ -32,10 +46,32 @@ import { TabStateCache, SearchService as SearchServiceModule, MigrationUtils } f
     { url: "https://figma.com", icon: "figma", color: "#f24e1e" },
   ];
 
+  const kAdBlockerId = "uBlock0@raymondhill.net";
+
   const gChoices = {
     setDefaultBrowser: false,
     essentials: new Set(),
+    blockAds: true,
   };
+
+  let _adBlocker;
+
+  async function fetchAdBlocker() {
+    if (_adBlocker !== undefined) {
+      return _adBlocker;
+    }
+    try {
+      const [found, installed] = await Promise.all([
+        lazy.AddonRepository.getAddonsByIDs([kAdBlockerId]),
+        lazy.AddonManager.getAddonsByIDs([kAdBlockerId]),
+      ]);
+      _adBlocker = installed[0] || !found[0]?.sourceURI ? null : found[0];
+    } catch (ex) {
+      console.error(ex);
+      _adBlocker = null;
+    }
+    return _adBlocker;
+  }
 
   function clearBrowserElements() {
     for (const element of document.getElementById("browser").children) {
@@ -140,6 +176,44 @@ import { TabStateCache, SearchService as SearchServiceModule, MigrationUtils } f
     return label;
   }
 
+  const _startedInstalls = new Set();
+
+  function unpinInstalledAddon(addon) {
+    const widgetId =
+      addon.id.toLowerCase().replace(/[^a-z0-9_-]/g, "_") + "-browser-action";
+    try {
+      if (lazy.CustomizableUI?.getPlacementOfWidget(widgetId)) {
+        lazy.CustomizableUI.addWidgetToArea(
+          widgetId,
+          lazy.CustomizableUI.AREA_ADDONS
+        );
+      }
+    } catch (ex) {
+      console.error(ex);
+    }
+  }
+
+  function installAddons(addons) {
+    for (const addon of addons) {
+      if (_startedInstalls.has(addon.id)) {
+        continue;
+      }
+      _startedInstalls.add(addon.id);
+      (async () => {
+        try {
+          const install = await lazy.AddonManager.getInstallForURL(
+            addon.sourceURI.spec,
+            { name: addon.name, icons: addon.icons }
+          );
+          await install.install();
+          unpinInstalledAddon(addon);
+        } catch (ex) {
+          console.error(`Failed to install ${addon.id}`, ex);
+        }
+      })();
+    }
+  }
+
   function removeVideoBackground() {
     const video = document.getElementById("zen-welcome-video");
     if (!video) {
@@ -216,6 +290,12 @@ import { TabStateCache, SearchService as SearchServiceModule, MigrationUtils } f
 
     #show(index, direction) {
       const previous = this.currentPage;
+      while (this.#pages[index]?.skip?.()) {
+        index += direction;
+      }
+      if (index < 0) {
+        return;
+      }
       this.#index = index;
       const page = this.currentPage;
       if (!page) {
@@ -278,7 +358,7 @@ import { TabStateCache, SearchService as SearchServiceModule, MigrationUtils } f
       if (page.id) {
         content.setAttribute("page", page.id);
       }
-      page.render(content);
+      page.render(content, this);
       this.contentContainer.appendChild(content);
       this.#content = content;
       animate(content, { opacity: [0, 1] }, kFade);
@@ -290,8 +370,8 @@ import { TabStateCache, SearchService as SearchServiceModule, MigrationUtils } f
       for (const button of this.currentPage.buttons) {
         const element = document.createElement("button");
         element.className = button.primary
-          ? "zen-welcome-button primary"
-          : "zen-welcome-button";
+          ? "zen-big-accent-button primary"
+          : "zen-big-accent-button";
         document.l10n.setAttributes(element, button.l10n);
         element.addEventListener("click", () => {
           if (button.onclick?.(this) !== false) {
@@ -333,6 +413,8 @@ import { TabStateCache, SearchService as SearchServiceModule, MigrationUtils } f
       await animate(`#browser > *:not(${elementsToIgnore})`, {
         opacity: [0, 1],
       });
+      _adBlocker = undefined;
+      _startedInstalls.clear();
     }
 
     async #applyChoices() {
@@ -562,6 +644,46 @@ import { TabStateCache, SearchService as SearchServiceModule, MigrationUtils } f
         },
       },
       {
+        id: "block-ads",
+        title: "zen-welcome-block-ads-title",
+        descriptions: ["zen-welcome-block-ads-description"],
+        buttons: [kNextButton],
+        // Nothing to offer once we know the add-on can't be installed.
+        skip() {
+          return _adBlocker === null;
+        },
+        async render(content, pages) {
+          content.appendChild(
+            createOption({
+              id: "zen-welcome-block-ads-yes",
+              group: "zen-welcome-block-ads",
+              l10n: "zen-welcome-block-ads-yes",
+              checked: gChoices.blockAds,
+            })
+          );
+          content.appendChild(
+            createOption({
+              id: "zen-welcome-block-ads-no",
+              group: "zen-welcome-block-ads",
+              l10n: "zen-welcome-block-ads-no",
+              checked: !gChoices.blockAds,
+            })
+          );
+          // The lookup is warmed at startup, so this usually settled long ago.
+          if ((await fetchAdBlocker()) === null && content.isConnected) {
+            pages.next();
+          }
+        },
+        commit(content) {
+          gChoices.blockAds = content.querySelector(
+            "#zen-welcome-block-ads-yes"
+          ).checked;
+          if (gChoices.blockAds && _adBlocker) {
+            installAddons([_adBlocker]);
+          }
+        },
+      },
+      {
         id: "essentials",
         title: "zen-welcome-essentials-title",
         descriptions: ["zen-welcome-essentials-description"],
@@ -771,6 +893,7 @@ import { TabStateCache, SearchService as SearchServiceModule, MigrationUtils } f
   }
 
   function startZenWelcome() {
+    fetchAdBlocker();
     clearBrowserElements();
     centerWindowOnScreen();
     initializeZenWelcome();

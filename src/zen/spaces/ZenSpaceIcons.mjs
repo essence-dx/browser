@@ -116,7 +116,7 @@ class nsZenWorkspaceIcons extends getElementBase() {
     button.setAttribute("zen-workspace-id", workspace.uuid);
     button.setAttribute("context", "zenWorkspaceMoreActions");
     const icon = makeXulElement("label");
-    icon.setAttribute("class", "zen-workspace-icon");
+    icon.setAttribute("class", "zen-workspace-icon no-squircles");
     const isSvgIcon = workspace.icon && workspace.icon.endsWith(".svg");
     if (gZenWorkspaces.workspaceHasIcon(workspace)) {
       if (isSvgIcon) {
@@ -139,11 +139,11 @@ class nsZenWorkspaceIcons extends getElementBase() {
 
   async #updateIcons() {
     const workspaces = gZenWorkspaces.getWorkspaces();
-    this.innerHTML = "";
+    const icons = document.createDocumentFragment();
     for (const workspace of workspaces) {
-      const button = this.#createWorkspaceIcon(workspace);
-      this.appendChild(button);
+      icons.appendChild(this.#createWorkspaceIcon(workspace));
     }
+    this.replaceChildren(icons);
     if (workspaces.length <= 1) {
       this.setAttribute("dont-show", "true");
     } else {
@@ -175,7 +175,7 @@ class nsZenWorkspaceIcons extends getElementBase() {
     for (const button of buttons) {
       if (button.getAttribute("zen-workspace-id") == uuid) {
         selected = i;
-      } else {
+      } else if (button.hasAttribute("active")) {
         button.removeAttribute("active");
       }
       i++;

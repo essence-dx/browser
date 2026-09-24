@@ -2,7 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-import { ZenSessionData } from "../sessionstore/ZenSessionManager.sys.mjs";
+import { ZenSession as ZenSessionData } from "../sessionstore/ZenSessionManager.sys.mjs";
+// Chromium: instance import aliased (upstream module name is ZenSessionStore).
 import { ZenLiveFoldersManager } from "../live-folders/ZenLiveFoldersManager.sys.mjs";
 import { getBoolPref } from "../adapters/prefs.mjs";
 import { readJSON, writeJSON, joinPath, getProfileDir } from "../adapters/storage.mjs";
@@ -159,6 +160,36 @@ export function recordDigest(kind, data) {
 class nsZenSpacesSyncModel {
   #cache = null;
   #saveTimer = 0;
+  /**
+   * Ids applied from an incoming batch, keyed to the projection generation
+   * (sidebar lastCollected) that was current when they were applied. The
+   * projection only refreshes on the delayed session collection that runs
+   * after the sync, so within the same sync the just-applied ids are in the
+   * uploaded snapshot (noteApplied) but not yet in the projection. Without
+   * this, the outgoing diff would read that gap as local deletions and
+   * upload tombstones for records it just downloaded, wiping them on every
+   * other device (gh-15426).
+   */
+  #appliedStamp = new Map();
+  #appliedStampGen = 0;
+
+  /** The projection generation the current sidebar data belongs to. */
+  #currentStamp() {
+    return lazy.ZenSessionData.getSidebarData()?.lastCollected || 0;
+  }
+
+  /**
+   * The current projection generation, dropping held ids once a newer
+   * collection has caught up (they can no longer be in the skew window).
+   */
+  #appliedStampNow() {
+    const stamp = this.#currentStamp();
+    if (stamp !== this.#appliedStampGen) {
+      this.#appliedStamp.clear();
+      this.#appliedStampGen = stamp;
+    }
+    return stamp;
+  }
 
   #storePath() {
     return joinPath(getProfileDir(), STORE_FILE_NAME);
@@ -534,30 +565,52 @@ class nsZenSpacesSyncModel {
     const map = new Map();
     const pending = new Set();
     const ctx = this.#projectionContext(sidebar);
-    const { tabs, folders, splits, splitParents, splitWs } = ctx;
+    const spaces = sidebar.spaces || [];
 
-    if (!lazy.syncNormalTabs) {
-      // Items excluded only by the normal-tabs option are held back, not
-      // deleted. Flipping the option off must not tombstone them remotely.
-      const held = new Set();
-      for (const tab of ctx.allTabs) {
-        if (this.#isTabRecordMaterial(tab) && !this.#isSyncableTab(tab)) {
-          held.add(tab.zenSyncId);
-          pending.add(tab.zenSyncId);
-        }
-      }
-      for (const split of sidebar.splitViewData || []) {
-        if (
-          split?.groupId &&
-          !ctx.splitIds.has(split.groupId) &&
-          Array.isArray(split.tabs) &&
-          split.tabs.some(id => held.has(id))
-        ) {
-          pending.add(split.groupId);
-        }
+    this.#collectHeldIds(ctx, sidebar, pending);
+    this.#projectContainers(map);
+    this.#projectSpaces(map, ctx, spaces);
+    this.#projectFolders(map, ctx, pending);
+    this.#projectTabs(map, ctx);
+    this.#projectSplits(map, ctx);
+    this.#projectLayout(map, ctx, spaces);
+
+    this.#cache = { stamp, map, pending };
+    return map;
+  }
+
+  /**
+   * Items excluded only by the normal-tabs option are held back, not
+   * deleted. Flipping the option off must not tombstone them remotely.
+   *
+   * @param {object} ctx - The projection context.
+   * @param {object} sidebar - The collected sidebar data.
+   * @param {Set<string>} pending - Receives the held-back ids.
+   */
+  #collectHeldIds(ctx, sidebar, pending) {
+    if (lazy.syncNormalTabs) {
+      return;
+    }
+    const held = new Set();
+    for (const tab of ctx.allTabs) {
+      if (this.#isTabRecordMaterial(tab) && !this.#isSyncableTab(tab)) {
+        held.add(tab.zenSyncId);
+        pending.add(tab.zenSyncId);
       }
     }
+    for (const split of sidebar.splitViewData || []) {
+      if (
+        split?.groupId &&
+        !ctx.splitIds.has(split.groupId) &&
+        Array.isArray(split.tabs) &&
+        split.tabs.some(id => held.has(id))
+      ) {
+        pending.add(split.groupId);
+      }
+    }
+  }
 
+  #projectContainers(map) {
     for (const identity of lazy.ContextualIdentityService.getPublicIdentities()) {
       if (!identity.name) {
         continue;
@@ -578,8 +631,9 @@ class nsZenSpacesSyncModel {
         },
       });
     }
+  }
 
-    const spaces = sidebar.spaces || [];
+  #projectSpaces(map, ctx, spaces) {
     for (const space of spaces) {
       if (!space?.uuid) {
         continue;
@@ -599,8 +653,10 @@ class nsZenSpacesSyncModel {
         },
       });
     }
+  }
 
-    for (const folder of folders) {
+  #projectFolders(map, ctx, pending) {
+    for (const folder of ctx.folders) {
       const fid = folder.id;
       let live = null;
       if (folder.isLiveFolder) {
@@ -627,11 +683,11 @@ class nsZenSpacesSyncModel {
         },
       });
     }
+  }
 
-    this.#projectTabs(map, ctx);
-
-    const tabById = new Map(tabs.map(t => [t.zenSyncId, t]));
-    for (const split of splits) {
+  #projectSplits(map, ctx) {
+    const tabById = new Map(ctx.tabs.map(t => [t.zenSyncId, t]));
+    for (const split of ctx.splits) {
       const member = tabById.get(split.tabs[0]);
       map.set(split.groupId, {
         kind: RECORD_KINDS.SPLIT,
@@ -640,34 +696,33 @@ class nsZenSpacesSyncModel {
           gridType: split.gridType || "grid",
           pinned: !!(member?.pinned || member?.zenEssential),
           tabs: [...split.tabs],
-          workspaceUuid: splitWs.get(split.groupId) ?? null,
-          folderId: splitParents.get(split.groupId) || null,
+          workspaceUuid: ctx.splitWs.get(split.groupId) ?? null,
+          folderId: ctx.splitParents.get(split.groupId) || null,
         },
       });
     }
+  }
 
-    if (spaces.length) {
-      const essentials = {};
-      for (const tab of tabs) {
-        if (!tab.zenEssential) {
-          continue;
-        }
-        const key =
-          this.guidForContextId(tab.userContextId, { create: true }) ||
-          "default";
-        (essentials[key] ||= []).push(tab.zenSyncId);
+  #projectLayout(map, ctx, spaces) {
+    if (!spaces.length) {
+      return;
+    }
+    const essentials = {};
+    for (const tab of ctx.tabs) {
+      if (!tab.zenEssential) {
+        continue;
       }
-      map.set(LAYOUT_RECORD_ID, {
-        kind: RECORD_KINDS.LAYOUT,
-        data: {
-          spaces: spaces.map(s => s.uuid).filter(Boolean),
-          essentials,
-        },
-      });
+      const key =
+        this.guidForContextId(tab.userContextId, { create: true }) || "default";
+      (essentials[key] ||= []).push(tab.zenSyncId);
     }
-
-    this.#cache = { stamp, map, pending };
-    return map;
+    map.set(LAYOUT_RECORD_ID, {
+      kind: RECORD_KINDS.LAYOUT,
+      data: {
+        spaces: spaces.map(s => s.uuid).filter(Boolean),
+        essentials,
+      },
+    });
   }
 
   /**
@@ -740,15 +795,20 @@ class nsZenSpacesSyncModel {
     const uploaded = (await this.#data()).uploaded;
     const current = await this.#digestAll();
     const pending = await this.#pendingIds();
+    const stamp = this.#appliedStampNow();
     const now = Date.now() / 1000;
     const changes = {};
     for (const [id, digest] of current) {
-      if (uploaded[id] !== digest) {
+      if (uploaded[id] !== digest && this.#appliedStamp.get(id) !== stamp) {
         changes[id] = now;
       }
     }
     for (const id of Object.keys(uploaded)) {
-      if (!current.has(id) && !pending.has(id)) {
+      if (
+        !current.has(id) &&
+        !pending.has(id) &&
+        this.#appliedStamp.get(id) !== stamp
+      ) {
         changes[id] = now;
       }
     }
@@ -771,13 +831,18 @@ class nsZenSpacesSyncModel {
     const uploaded = (await this.#data()).uploaded;
     const current = await this.#digestAll();
     const pending = await this.#pendingIds();
+    const stamp = this.#appliedStampNow();
     for (const [id, digest] of current) {
-      if (uploaded[id] !== digest) {
+      if (uploaded[id] !== digest && this.#appliedStamp.get(id) !== stamp) {
         return true;
       }
     }
     for (const id of Object.keys(uploaded)) {
-      if (!current.has(id) && !pending.has(id)) {
+      if (
+        !current.has(id) &&
+        !pending.has(id) &&
+        this.#appliedStamp.get(id) !== stamp
+      ) {
         return true;
       }
     }
@@ -790,7 +855,7 @@ class nsZenSpacesSyncModel {
    *
    * @param {Array<string>} ids
    */
-  markUploaded(ids) {
+  async markUploaded(ids) {
     const data = await this.#data();
     const current = await this.#digestAll();
     for (const id of ids) {
@@ -820,11 +885,13 @@ class nsZenSpacesSyncModel {
    */
   async noteApplied(id, cleartext) {
     const data = await this.#data();
+    const stamp = this.#appliedStampNow();
     if (!cleartext) {
       delete data.uploaded[id];
     } else {
       data.uploaded[id] = recordDigest(cleartext.kind, cleartext.data);
     }
+    this.#appliedStamp.set(id, stamp);
     syncLog(
       `acknowledged incoming ${cleartext ? cleartext.kind : "tombstone"} ${id}`
     );
